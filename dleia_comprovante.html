@@ -162,13 +162,13 @@
         <input type="password" id="anthropic-key" placeholder="sk-ant-..." />
       </div>
       <div class="card">
-        <div class="card-title">📱 Z-API (WhatsApp)</div>
-        <label>Instance ID</label>
-        <input type="text" id="zapi-instance" placeholder="3F4B4983FB4671C115D29202A3FD2FF8" />
-        <label>Token da instância</label>
-        <input type="password" id="zapi-token" placeholder="6B8BAFAFB513538979F34799" />
-        <label>Client Token</label>
-        <input type="password" id="zapi-client-token" placeholder="Fd82d50f87d..." />
+        <div class="card-title">📱 Evolution API (WhatsApp)</div>
+        <label>URL do servidor <span class="label-hint">sem https://</span></label>
+        <input type="text" id="evo-server" placeholder="evolution-api-ll04.srv1770269.hstgr.cloud" />
+        <label>Nome da instância</label>
+        <input type="text" id="evo-instance" placeholder="dleia" />
+        <label>API Key</label>
+        <input type="password" id="evo-apikey" placeholder="91635C7604D9-4FC1-BCF7-4D9B3E0658FB" />
       </div>
       <button class="btn btn-green" onclick="saveConfig()">💾 Salvar configurações</button>
     </div>
@@ -285,22 +285,22 @@ let dadosLidos = [];
 
 // ===== CONFIG =====
 function saveConfig() {
-  localStorage.setItem('anthropic_key',     document.getElementById('anthropic-key').value.trim());
-  localStorage.setItem('zapi_instance',     document.getElementById('zapi-instance').value.trim());
-  localStorage.setItem('zapi_token',        document.getElementById('zapi-token').value.trim());
-  localStorage.setItem('zapi_client_token', document.getElementById('zapi-client-token').value.trim());
-  localStorage.setItem('msg_template',      document.getElementById('msg-template').value);
-  localStorage.setItem('nome_loja',         document.getElementById('nome-loja').value.trim());
-  localStorage.setItem('cor_loja',          document.getElementById('cor-hex').value.trim());
+  localStorage.setItem('anthropic_key', document.getElementById('anthropic-key').value.trim());
+  localStorage.setItem('evo_server',    document.getElementById('evo-server').value.trim().replace(/^https?:\/\//, '').replace(/\/$/, ''));
+  localStorage.setItem('evo_instance',  document.getElementById('evo-instance').value.trim());
+  localStorage.setItem('evo_apikey',    document.getElementById('evo-apikey').value.trim());
+  localStorage.setItem('msg_template',  document.getElementById('msg-template').value);
+  localStorage.setItem('nome_loja',     document.getElementById('nome-loja').value.trim());
+  localStorage.setItem('cor_loja',      document.getElementById('cor-hex').value.trim());
   aplicarAparencia();
   alert('✅ Configurações salvas!');
 }
 
 function loadConfig() {
-  document.getElementById('anthropic-key').value     = localStorage.getItem('anthropic_key') || '';
-  document.getElementById('zapi-instance').value     = localStorage.getItem('zapi_instance') || '';
-  document.getElementById('zapi-token').value        = localStorage.getItem('zapi_token') || '';
-  document.getElementById('zapi-client-token').value = localStorage.getItem('zapi_client_token') || '';
+  document.getElementById('anthropic-key').value = localStorage.getItem('anthropic_key') || '';
+  document.getElementById('evo-server').value    = localStorage.getItem('evo_server') || '';
+  document.getElementById('evo-instance').value  = localStorage.getItem('evo_instance') || '';
+  document.getElementById('evo-apikey').value    = localStorage.getItem('evo_apikey') || '';
   document.getElementById('msg-template').value      = localStorage.getItem('msg_template') || MSG_PADRAO;
   document.getElementById('nome-loja').value         = localStorage.getItem('nome_loja') || "D'Leia Moda Fitness";
   document.getElementById('cor-hex').value           = localStorage.getItem('cor_loja') || '#1D9E75';
@@ -413,12 +413,12 @@ function updateItem(i, nome, detail, badge, badgeClass) {
 }
 
 async function startProcessing() {
-  const anthropicKey    = localStorage.getItem('anthropic_key');
-  const zapiInstance    = localStorage.getItem('zapi_instance');
-  const zapiToken       = localStorage.getItem('zapi_token');
-  const zapiClientToken = localStorage.getItem('zapi_client_token');
+  const anthropicKey = localStorage.getItem('anthropic_key');
+  const evoServer     = localStorage.getItem('evo_server');
+  const evoInstance   = localStorage.getItem('evo_instance');
+  const evoApiKey     = localStorage.getItem('evo_apikey');
 
-  if (!anthropicKey || !zapiInstance || !zapiToken || !zapiClientToken) {
+  if (!anthropicKey || !evoServer || !evoInstance || !evoApiKey) {
     alert('Configure todas as chaves no Painel antes de enviar.');
     return;
   }
@@ -437,7 +437,7 @@ async function startProcessing() {
       const dados = await lerEtiqueta(selectedFiles[i], anthropicKey);
       if (!dados || !dados.telefone) throw new Error('Telefone não encontrado');
       updateItem(i, dados.nome || selectedFiles[i].name, `${dados.telefone} · Enviando...`, 'Enviando', 'badge-proc');
-      await enviarFoto(selectedFiles[i], dados, zapiInstance, zapiToken, zapiClientToken);
+      await enviarFoto(selectedFiles[i], dados, evoServer, evoInstance, evoApiKey);
       updateItem(i, dados.nome, `${dados.telefone} · ✓ Enviado`, 'Enviado', 'badge-ok');
       dadosLidos.push({ ...dados, previewUrl: items[i].previewUrl, sucesso: true });
       ok++;
@@ -480,38 +480,41 @@ async function lerEtiqueta(file, apiKey) {
   return JSON.parse(text);
 }
 
-async function enviarFoto(file, dados, instance, token, clientToken) {
+async function enviarFoto(file, dados, serverUrl, instanceName, apiKey) {
   const b64 = await toBase64(file);
   const telefone = dados.telefone.replace(/\D/g,'');
   const caption = montarMensagem(dados);
-  const url = `https://api.z-api.io/instances/${instance}/token/${token}/send-image`;
+  const url = `https://${serverUrl}/message/sendMedia/${instanceName}`;
   const resp = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Client-Token': clientToken },
+    headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
     body: JSON.stringify({
-      phone: `55${telefone}`,
-      image: `data:${file.type||'image/jpeg'};base64,${b64}`,
+      number: `55${telefone}`,
+      mediatype: 'image',
+      mimetype: file.type || 'image/jpeg',
+      media: b64,
+      fileName: file.name || 'comprovante.jpg',
       caption: caption
     })
   });
   if (!resp.ok) {
     const txt = await resp.text();
-    throw new Error('Z-API foto erro ' + resp.status + ': ' + txt.slice(0,80));
+    throw new Error('Evolution API foto erro ' + resp.status + ': ' + txt.slice(0,120));
   }
 }
 
-async function enviarMensagem(dados, instance, token, clientToken) {
+async function enviarMensagem(dados, serverUrl, instanceName, apiKey) {
   const telefone = dados.telefone.replace(/\D/g,'');
   const mensagem = montarMensagem(dados);
-  const url = `https://api.z-api.io/instances/${instance}/token/${token}/send-text`;
+  const url = `https://${serverUrl}/message/sendText/${instanceName}`;
   const resp = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Client-Token': clientToken },
-    body: JSON.stringify({ phone: `55${telefone}`, message: mensagem })
+    headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+    body: JSON.stringify({ number: `55${telefone}`, text: mensagem })
   });
   if (!resp.ok) {
     const txt = await resp.text();
-    throw new Error('Z-API msg erro ' + resp.status + ': ' + txt.slice(0,80));
+    throw new Error('Evolution API msg erro ' + resp.status + ': ' + txt.slice(0,120));
   }
 }
 
