@@ -1,7 +1,7 @@
 {
-  "name": "D'Leia Comprovantes",
-  "short_name": "D'Leia",
-  "description": "Envio automático de comprovantes via WhatsApp para D'Leia Moda Fitness",
+  "name": "ComprovAI",
+  "short_name": "ComprovAI",
+  "description": "Envio automático de comprovantes via WhatsApp com leitura de etiqueta por IA",
   "start_url": "./app.html",
   "scope": "./",
   "display": "standalone",
