@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>D'Leia — Comprovante WhatsApp</title>
+<title>ComprovAI — Comprovante WhatsApp</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -146,7 +146,7 @@
 
 <div class="topbar" id="topbar">
   <div>
-    <h1 id="nome-loja-topbar">D'Leia Moda Fitness</h1>
+    <h1 id="nome-loja-topbar">Minha Loja</h1>
     <span>Comprovante WhatsApp</span>
   </div>
   <div class="topbar-btns">
@@ -222,7 +222,7 @@
       <div class="card">
         <div class="card-title">🏪 Dados da loja</div>
         <label>Nome da loja</label>
-        <input type="text" id="nome-loja" placeholder="D'Leia Moda Fitness" />
+        <input type="text" id="nome-loja" placeholder="Minha Loja" />
         <div class="divider"></div>
         <div class="card-title">🎨 Cor principal</div>
         <div class="color-row">
@@ -338,7 +338,7 @@ function loadConfig() {
   document.getElementById('evo-apikey').value    = localStorage.getItem('evo_apikey') || '';
   document.getElementById('intervalo-envio').value = localStorage.getItem('intervalo_envio') || 'auto';
   document.getElementById('msg-template').value      = localStorage.getItem('msg_template') || MSG_PADRAO;
-  document.getElementById('nome-loja').value         = localStorage.getItem('nome_loja') || "D'Leia Moda Fitness";
+  document.getElementById('nome-loja').value         = localStorage.getItem('nome_loja') || "Minha Loja";
   document.getElementById('cor-hex').value           = localStorage.getItem('cor_loja') || '#1D9E75';
   document.getElementById('cor-picker').value        = localStorage.getItem('cor_loja') || '#1D9E75';
   aplicarAparencia();
@@ -347,7 +347,7 @@ function loadConfig() {
 
 function aplicarAparencia() {
   const cor = localStorage.getItem('cor_loja') || '#1D9E75';
-  const nome = localStorage.getItem('nome_loja') || "D'Leia Moda Fitness";
+  const nome = localStorage.getItem('nome_loja') || "Minha Loja";
   document.documentElement.style.setProperty('--cor-loja', cor);
   document.getElementById('nome-loja-topbar').textContent = nome;
 }
