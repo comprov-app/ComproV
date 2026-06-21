@@ -1,6 +1,6 @@
 // Service Worker para D'Leia Comprovantes
 // Versão do app — MUDE ESTE NÚMERO sempre que atualizar o app
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 const CACHE_NAME = 'dleia-comprovante-' + APP_VERSION;
 
 const ASSETS_TO_CACHE = [
@@ -34,22 +34,31 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Estratégia: tenta buscar na rede primeiro (pra pegar versão nova),
-// se não conseguir (offline) usa o cache salvo
+// Estratégia: só intercepta requisições do próprio app (GET, mesma origem).
+// Chamadas para APIs externas (Claude, Evolution API) passam direto, sem cache,
+// senão o navegador pode falhar ao tentar cachear POSTs ou recursos cross-origin.
 self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  // Deixa passar direto: métodos diferentes de GET (POST/PUT/etc das APIs)
+  // e requisições para outros domínios (api.anthropic.com, servidor Evolution API)
+  if (req.method !== 'GET' || url.origin !== self.location.origin) {
+    return; // não chama respondWith = o navegador faz a requisição normalmente
+  }
+
   event.respondWith(
-    fetch(event.request)
+    fetch(req)
       .then((response) => {
-        // Atualiza o cache com a versão mais recente
         const responseClone = response.clone();
         caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseClone);
+          cache.put(req, responseClone);
         });
         return response;
       })
       .catch(() => {
         // Sem internet: usa o que está salvo
-        return caches.match(event.request);
+        return caches.match(req);
       })
   );
 });
