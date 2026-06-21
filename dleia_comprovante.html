@@ -95,6 +95,12 @@
   .badge-proc { background:#D1ECF1; color:#0c5460; }
   .badge-ok   { background:#D4EDDA; color:#155724; }
   .badge-err  { background:#F8D7DA; color:#721c24; }
+  .btn-share {
+    background: #721c24; color: #fff; border: none; border-radius: 8px;
+    padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+    flex-shrink: 0; white-space: nowrap;
+  }
+  .btn-share:hover { opacity: .85; }
   .summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
   .summary-box { background: var(--summary-bg); border-radius:10px; padding:12px 8px; text-align:center; }
   .summary-box .num { font-size:22px; font-weight:700; }
@@ -433,17 +439,26 @@ async function startProcessing() {
   for (let i = 0; i < selectedFiles.length; i++) {
     updateProgress(i, selectedFiles.length);
     updateItem(i, selectedFiles[i].name, 'IA lendo a imagem...', 'Lendo', 'badge-proc');
+    let dadosParciais = null;
     try {
       const dados = await lerEtiqueta(selectedFiles[i], anthropicKey);
+      dadosParciais = dados;
       if (!dados || !dados.telefone) throw new Error('Telefone não encontrado');
       updateItem(i, dados.nome || selectedFiles[i].name, `${dados.telefone} · Enviando...`, 'Enviando', 'badge-proc');
       await enviarFoto(selectedFiles[i], dados, evoServer, evoInstance, evoApiKey);
       updateItem(i, dados.nome, `${dados.telefone} · ✓ Enviado`, 'Enviado', 'badge-ok');
-      dadosLidos.push({ ...dados, previewUrl: items[i].previewUrl, sucesso: true });
+      dadosLidos.push({ ...dados, file: selectedFiles[i], previewUrl: items[i].previewUrl, sucesso: true });
       ok++;
     } catch(e) {
-      updateItem(i, selectedFiles[i].name, 'Erro: ' + e.message, 'Erro', 'badge-err');
-      dadosLidos.push({ nome: selectedFiles[i].name, sucesso: false, previewUrl: items[i].previewUrl, erro: e.message });
+      updateItem(i, (dadosParciais && dadosParciais.nome) || selectedFiles[i].name, 'Erro: ' + e.message, 'Erro', 'badge-err');
+      dadosLidos.push({
+        ...(dadosParciais || {}),
+        nome: (dadosParciais && dadosParciais.nome) || selectedFiles[i].name,
+        file: selectedFiles[i],
+        sucesso: false,
+        previewUrl: items[i].previewUrl,
+        erro: e.message
+      });
       err++;
     }
     updateProgress(i+1, selectedFiles.length);
@@ -533,16 +548,53 @@ function showDone(ok, err) {
   document.getElementById('s-total').textContent = dadosLidos.length;
   document.getElementById('s-ok').textContent = ok;
   document.getElementById('s-err').textContent = err;
-  document.getElementById('done-list').innerHTML = dadosLidos.map(r => `
+  document.getElementById('done-list').innerHTML = dadosLidos.map((r, i) => `
     <div class="item-row">
       <img class="item-thumb" src="${r.previewUrl}" />
       <div class="item-info">
         <div class="name">${r.nome||'?'}</div>
         <div class="detail">${r.telefone||r.erro||''}</div>
       </div>
-      <span class="badge ${r.sucesso?'badge-ok':'badge-err'}">${r.sucesso?'Enviado':'Erro'}</span>
+      ${r.sucesso
+        ? `<span class="badge badge-ok">Enviado</span>`
+        : `<button class="btn-share" onclick="compartilharFoto(${i})">📤 Enviar Manualmente</button>`
+      }
     </div>`).join('');
   setSection('sec-done');
+}
+
+async function compartilharFoto(i) {
+  const item = dadosLidos[i];
+  if (!item || !item.file) {
+    alert('Foto não disponível para compartilhar.');
+    return;
+  }
+
+  // Só monta a legenda do comprovante se a IA conseguiu ler o telefone
+  const legenda = item.telefone ? montarMensagem(item) : '';
+
+  // Web Share API com arquivo: abre o menu nativo do celular (WhatsApp, etc)
+  if (navigator.canShare && navigator.canShare({ files: [item.file] })) {
+    try {
+      await navigator.share({
+        files: [item.file],
+        text: legenda
+      });
+      return;
+    } catch (e) {
+      // Usuário cancelou o compartilhamento ou navegador bloqueou — tenta fallback
+      if (e.name === 'AbortError') return;
+    }
+  }
+
+  // Fallback: navegador não suporta compartilhar arquivo (ex: PC) — baixa a foto
+  const link = document.createElement('a');
+  link.href = item.previewUrl;
+  link.download = item.file.name || 'comprovante.jpg';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  alert('Seu navegador não permite compartilhar direto. A foto foi baixada — envie manualmente pelo WhatsApp.');
 }
 
 function resetApp() {
@@ -555,30 +607,77 @@ function resetApp() {
 
 function toBase64(file) {
   return new Promise((res, rej) => {
+    if (!file || !file.type || !file.type.startsWith('image/')) {
+      rej(new Error('Arquivo não é uma imagem válida'));
+      return;
+    }
+
     const img = new Image();
     const url = URL.createObjectURL(file);
+
+    const limpar = () => URL.revokeObjectURL(url);
+
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const isLandscape = img.width > img.height;
-      if (isLandscape) {
-        // Rotaciona 90 graus para deixar vertical
-        canvas.width = img.height;
-        canvas.height = img.width;
+      try {
+        if (!img.width || !img.height) {
+          limpar();
+          rej(new Error('Imagem com dimensões inválidas'));
+          return;
+        }
+
+        // Limita o lado maior a 1600px para evitar travar em fotos muito grandes (12MP+)
+        const MAX_LADO = 1600;
+        let w = img.width;
+        let h = img.height;
+        const maiorLado = Math.max(w, h);
+        if (maiorLado > MAX_LADO) {
+          const escala = MAX_LADO / maiorLado;
+          w = Math.round(w * escala);
+          h = Math.round(h * escala);
+        }
+
+        const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate(90 * Math.PI / 180);
-        ctx.drawImage(img, -img.width / 2, -img.height / 2);
-      } else {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
+        if (!ctx) {
+          limpar();
+          rej(new Error('Não foi possível processar a imagem neste dispositivo'));
+          return;
+        }
+
+        const isLandscape = w > h;
+        if (isLandscape) {
+          // Rotaciona 90 graus para deixar vertical
+          canvas.width = h;
+          canvas.height = w;
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate(90 * Math.PI / 180);
+          ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        } else {
+          canvas.width = w;
+          canvas.height = h;
+          ctx.drawImage(img, 0, 0, w, h);
+        }
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        if (!dataUrl || dataUrl === 'data:,') {
+          limpar();
+          rej(new Error('Falha ao converter imagem (canvas vazio)'));
+          return;
+        }
+
+        res(dataUrl.split(',')[1]);
+        limpar();
+      } catch (e) {
+        limpar();
+        rej(new Error('Erro ao processar imagem: ' + e.message));
       }
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-      res(dataUrl.split(',')[1]);
-      URL.revokeObjectURL(url);
     };
-    img.onerror = () => rej(new Error('Erro ao ler imagem'));
+
+    img.onerror = () => {
+      limpar();
+      rej(new Error('Não foi possível abrir esta imagem (arquivo corrompido ou formato não suportado)'));
+    };
+
     img.src = url;
   });
 }
