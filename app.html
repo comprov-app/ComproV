@@ -329,6 +329,9 @@
 
   <!-- ========== PROCESSANDO ========== -->
   <div class="section" id="sec-processing">
+    <div id="aviso-segundo-plano" class="alert alert-warn" style="display:none; margin-bottom:12px;">
+      ⏸️ <b>O app foi pra segundo plano!</b> O envio pode pausar enquanto você estiver em outro aplicativo. Volte pra esta tela para garantir que continue enviando.
+    </div>
     <div class="card">
       <div class="card-title">📤 Enviando comprovantes...</div>
       <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
@@ -588,6 +591,80 @@ function updateItem(i, nome, detail, badge, badgeClass) {
   if(b) { b.textContent = badge; b.className = 'badge ' + badgeClass; }
 }
 
+// ===== WAKE LOCK: mantém o app ativo enquanto a tela estiver aberta =====
+let wakeLockAtivo = null;
+
+async function pedirWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLockAtivo = await navigator.wakeLock.request('screen');
+      wakeLockAtivo.addEventListener('release', () => { wakeLockAtivo = null; });
+    }
+  } catch (e) {
+    console.log('Wake Lock não disponível neste dispositivo:', e.message);
+  }
+}
+
+function liberarWakeLock() {
+  if (wakeLockAtivo) {
+    wakeLockAtivo.release().catch(() => {});
+    wakeLockAtivo = null;
+  }
+}
+
+// Se o app voltou a ficar visível e ainda estamos processando, repede o Wake Lock
+// (o sistema sempre libera o lock automaticamente ao trocar de app)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && loteEmAndamento) {
+    pedirWakeLock();
+    mostrarAvisoVoltouAtivo();
+  } else if (document.visibilityState === 'hidden' && loteEmAndamento) {
+    mostrarAvisoSegundoPlano();
+  }
+});
+
+let loteEmAndamento = false;
+
+function mostrarAvisoSegundoPlano() {
+  const banner = document.getElementById('aviso-segundo-plano');
+  if (banner) banner.style.display = 'block';
+}
+
+function mostrarAvisoVoltouAtivo() {
+  const banner = document.getElementById('aviso-segundo-plano');
+  if (banner) banner.style.display = 'none';
+}
+
+// ===== RETOMAR LOTE: salva progresso para continuar se a página recarregar =====
+function salvarProgressoLote(indiceAtual, total) {
+  localStorage.setItem('lote_em_andamento', JSON.stringify({
+    indice: indiceAtual,
+    total: total,
+    timestamp: Date.now()
+  }));
+}
+
+function limparProgressoLote() {
+  localStorage.removeItem('lote_em_andamento');
+}
+
+function verificarLotePendente() {
+  const pendente = localStorage.getItem('lote_em_andamento');
+  if (!pendente) return null;
+  try {
+    const dados = JSON.parse(pendente);
+    // Só considera válido se foi salvo há menos de 30 minutos (evita lixo antigo)
+    if (Date.now() - dados.timestamp > 30 * 60 * 1000) {
+      limparProgressoLote();
+      return null;
+    }
+    return dados;
+  } catch (e) {
+    limparProgressoLote();
+    return null;
+  }
+}
+
 async function startProcessing() {
   const anthropicKey = localStorage.getItem('anthropic_key');
   const evoServer     = localStorage.getItem('evo_server');
@@ -604,6 +681,9 @@ async function startProcessing() {
   setSection('sec-processing');
   renderItems(items);
 
+  loteEmAndamento = true;
+  await pedirWakeLock();
+
   let ok = 0, err = 0;
   const inicioLote = Date.now();
 
@@ -615,6 +695,7 @@ async function startProcessing() {
   const intervaloEnvios = segundosIntervalo * 1000;
 
   for (let i = 0; i < selectedFiles.length; i++) {
+    salvarProgressoLote(i, selectedFiles.length);
     updateProgress(i, selectedFiles.length);
     updateItem(i, selectedFiles[i].name, 'IA lendo a imagem...', 'Lendo', 'badge-proc');
     let dadosParciais = null;
@@ -655,6 +736,10 @@ async function startProcessing() {
       await contagemRegressiva(intervaloEnvios);
     }
   }
+
+  loteEmAndamento = false;
+  liberarWakeLock();
+  limparProgressoLote();
 
   await sleep(400);
   salvarHistorico(inicioLote, ok, err);
@@ -1007,6 +1092,16 @@ function toggleTheme() {
 aplicarTema();
 loadConfig();
 atualizarAvisoTaxaTodos();
+
+// Se o app foi recarregado (fechado e reaberto) no meio de um lote, os arquivos
+// de imagem se perdem da memória — avisa o usuário em vez de deixar confuso
+const lotePendente = verificarLotePendente();
+if (lotePendente) {
+  limparProgressoLote();
+  setTimeout(() => {
+    alert(`⚠️ O envio anterior foi interrompido no item ${lotePendente.indice + 1} de ${lotePendente.total} (o app foi fechado ou recarregado). Selecione as fotos que ainda faltam enviar e tente novamente.`);
+  }, 300);
+}
 
 // ===== PWA: registro do service worker e aviso de atualização =====
 if ('serviceWorker' in navigator) {
