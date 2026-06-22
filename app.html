@@ -217,10 +217,23 @@
       <button class="btn btn-gray" onclick="resetMensagem()">↩️ Restaurar padrão</button>
 
       <div class="card" style="margin-top:12px;">
+        <div class="card-title">💵 Cobrar taxa de todos do lote</div>
+        <div class="alert alert-warn">Quando ativado, TODOS os comprovantes enviados neste lote recebem a mensagem de taxa com o valor abaixo — mesmo sem $ na etiqueta. Use para excursões onde toda a remessa paga a mesma taxa.</div>
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <input type="checkbox" id="taxa-todos-toggle" onchange="toggleCampoTaxaTodos()" style="width:18px; height:18px; margin:0; cursor:pointer;" />
+          Ativar cobrança de taxa para todos
+        </label>
+        <div id="campo-taxa-todos-valor" style="display:none; margin-top:10px;">
+          <label>Valor da taxa para todos (R$)</label>
+          <input type="text" id="taxa-todos-valor" placeholder="5.00" />
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
         <div class="card-title">💰 Dados do PIX (taxa de excursão)</div>
-        <div class="alert alert-info">Esses dados aparecem automaticamente na mensagem quando a etiqueta tiver $ ou $$ (taxa de excursão).</div>
+        <div class="alert alert-info">Esses dados aparecem automaticamente na mensagem quando a etiqueta tiver $ ou $$, ou quando a cobrança para todos estiver ativada.</div>
         <label>Chave PIX</label>
-        <input type="text" id="pix-chave" placeholder="seuemail@gmail.com" />
+        <input type="text" id="pix-chave" placeholder="Sua Chave PIX" />
         <label>Nome do titular</label>
         <input type="text" id="pix-nome" placeholder="Nome completo" />
         <label>Banco / Carteira <span class="label-hint">opcional</span></label>
@@ -266,6 +279,7 @@
         <span>Pode selecionar várias de uma vez</span>
       </div>
       <input type="file" id="file-input" accept="image/*" multiple onchange="onFilesSelected(this.files)">
+      <div id="aviso-taxa-todos" class="alert alert-warn" style="display:none; margin-top:12px;"></div>
       <div class="thumb-grid" id="thumb-grid"></div>
       <div class="alert alert-warn" id="aviso-intervalo" style="display:none; margin-top:12px;"></div>
     </div>
@@ -338,6 +352,9 @@ function saveConfig() {
     localStorage.setItem('intervalo_envio', isNaN(intervaloVal) || intervaloVal < 0 ? 'auto' : String(intervaloVal));
   }
   localStorage.setItem('msg_template',  document.getElementById('msg-template').value);
+  localStorage.setItem('taxa_todos_ativa', document.getElementById('taxa-todos-toggle').checked ? '1' : '0');
+  const taxaTodosVal = document.getElementById('taxa-todos-valor').value.trim().replace(',', '.');
+  localStorage.setItem('taxa_todos_valor', taxaTodosVal);
   localStorage.setItem('pix_chave',     document.getElementById('pix-chave').value.trim());
   localStorage.setItem('pix_nome',      document.getElementById('pix-nome').value.trim());
   localStorage.setItem('pix_banco',     document.getElementById('pix-banco').value.trim());
@@ -354,6 +371,9 @@ function loadConfig() {
   document.getElementById('evo-apikey').value    = localStorage.getItem('evo_apikey') || '';
   document.getElementById('intervalo-envio').value = localStorage.getItem('intervalo_envio') || 'auto';
   document.getElementById('msg-template').value      = localStorage.getItem('msg_template') || MSG_PADRAO;
+  document.getElementById('taxa-todos-toggle').checked = localStorage.getItem('taxa_todos_ativa') === '1';
+  document.getElementById('taxa-todos-valor').value    = localStorage.getItem('taxa_todos_valor') || '';
+  toggleCampoTaxaTodos();
   document.getElementById('pix-chave').value         = localStorage.getItem('pix_chave') || '';
   document.getElementById('pix-nome').value          = localStorage.getItem('pix_nome') || '';
   document.getElementById('pix-banco').value         = localStorage.getItem('pix_banco') || '';
@@ -376,6 +396,11 @@ function aplicarAparencia() {
 function resetMensagem() {
   document.getElementById('msg-template').value = MSG_PADRAO;
   atualizarPreview();
+}
+
+function toggleCampoTaxaTodos() {
+  const ativado = document.getElementById('taxa-todos-toggle').checked;
+  document.getElementById('campo-taxa-todos-valor').style.display = ativado ? 'block' : 'none';
 }
 
 function syncCor(val) {
@@ -419,6 +444,20 @@ document.getElementById('cor-hex').addEventListener('input', function() {
 function setSection(id) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  if (id === 'sec-upload') atualizarAvisoTaxaTodos();
+}
+
+function atualizarAvisoTaxaTodos() {
+  const aviso = document.getElementById('aviso-taxa-todos');
+  if (!aviso) return;
+  const ativa = localStorage.getItem('taxa_todos_ativa') === '1';
+  const valor = localStorage.getItem('taxa_todos_valor');
+  if (ativa && valor) {
+    aviso.style.display = 'block';
+    aviso.innerHTML = `💵 <b>Cobrança de taxa ativada para todos!</b> Todos os comprovantes deste lote vão receber a mensagem de taxa de <b>R$ ${parseFloat(valor).toFixed(2)}</b>, mesmo sem $ na etiqueta. Desative em ⚙️ Painel → Mensagem se não for o caso.`;
+  } else {
+    aviso.style.display = 'none';
+  }
 }
 
 function showTab(id, btn) {
@@ -540,6 +579,14 @@ async function startProcessing() {
     let dadosParciais = null;
     try {
       const dados = await lerEtiqueta(selectedFiles[i], anthropicKey);
+
+      // Se "cobrar taxa de todos" estiver ativo, força a taxa em todo o lote,
+      // ignorando o $ / $$ lido da etiqueta
+      if (localStorage.getItem('taxa_todos_ativa') === '1') {
+        const valorForcado = localStorage.getItem('taxa_todos_valor');
+        if (valorForcado) dados.taxa = valorForcado;
+      }
+
       dadosParciais = dados;
       if (!dados || !dados.telefone) throw new Error('Telefone não encontrado');
       updateItem(i, dados.nome || selectedFiles[i].name, `${dados.telefone} · Enviando...`, 'Enviando', 'badge-proc');
@@ -918,6 +965,7 @@ function toggleTheme() {
 
 aplicarTema();
 loadConfig();
+atualizarAvisoTaxaTodos();
 
 // ===== PWA: registro do service worker e aviso de atualização =====
 if ('serviceWorker' in navigator) {
