@@ -215,6 +215,18 @@
       </div>
       <button class="btn btn-green" onclick="saveConfig()">💾 Salvar mensagem</button>
       <button class="btn btn-gray" onclick="resetMensagem()">↩️ Restaurar padrão</button>
+
+      <div class="card" style="margin-top:12px;">
+        <div class="card-title">💰 Dados do PIX (taxa de excursão)</div>
+        <div class="alert alert-info">Esses dados aparecem automaticamente na mensagem quando a etiqueta tiver $ ou $$ (taxa de excursão).</div>
+        <label>Chave PIX</label>
+        <input type="text" id="pix-chave" placeholder="seuemail@gmail.com" />
+        <label>Nome do titular</label>
+        <input type="text" id="pix-nome" placeholder="Nome completo" />
+        <label>Banco / Carteira <span class="label-hint">opcional</span></label>
+        <input type="text" id="pix-banco" placeholder="Mercado Pago" />
+      </div>
+      <button class="btn btn-green" onclick="saveConfig()">💾 Salvar PIX</button>
     </div>
 
     <!-- ABA APARÊNCIA -->
@@ -307,7 +319,7 @@ const MSG_TAXA = `Olá, *{nome}*! Seu pacote foi entregue! ✅
 
 💰 Taxa cobrada pela Excursão: *R$ {taxa}*
 
-PIX: 🔑 daviddexten@gmail.com 👤 David Dextem (Mercado Pago)`;
+PIX: 🔑 {pix_chave} 👤 {pix_nome} ({pix_banco})`;
 
 let selectedFiles = [];
 let dadosLidos = [];
@@ -326,6 +338,9 @@ function saveConfig() {
     localStorage.setItem('intervalo_envio', isNaN(intervaloVal) || intervaloVal < 0 ? 'auto' : String(intervaloVal));
   }
   localStorage.setItem('msg_template',  document.getElementById('msg-template').value);
+  localStorage.setItem('pix_chave',     document.getElementById('pix-chave').value.trim());
+  localStorage.setItem('pix_nome',      document.getElementById('pix-nome').value.trim());
+  localStorage.setItem('pix_banco',     document.getElementById('pix-banco').value.trim());
   localStorage.setItem('nome_loja',     document.getElementById('nome-loja').value.trim());
   localStorage.setItem('cor_loja',      document.getElementById('cor-hex').value.trim());
   aplicarAparencia();
@@ -339,6 +354,9 @@ function loadConfig() {
   document.getElementById('evo-apikey').value    = localStorage.getItem('evo_apikey') || '';
   document.getElementById('intervalo-envio').value = localStorage.getItem('intervalo_envio') || 'auto';
   document.getElementById('msg-template').value      = localStorage.getItem('msg_template') || MSG_PADRAO;
+  document.getElementById('pix-chave').value         = localStorage.getItem('pix_chave') || '';
+  document.getElementById('pix-nome').value          = localStorage.getItem('pix_nome') || '';
+  document.getElementById('pix-banco').value         = localStorage.getItem('pix_banco') || '';
   document.getElementById('nome-loja').value         = localStorage.getItem('nome_loja') || "Minha Loja";
   document.getElementById('cor-hex').value           = localStorage.getItem('cor_loja') || '#3a3f44';
   document.getElementById('cor-picker').value        = localStorage.getItem('cor_loja') || '#3a3f44';
@@ -637,12 +655,18 @@ async function enviarMensagem(dados, serverUrl, instanceName, apiKey) {
 function montarMensagem(dados) {
   const temTaxa = dados.taxa && dados.taxa !== 'sem taxa' && dados.taxa !== '' && dados.taxa !== '0';
   const tpl = temTaxa ? MSG_TAXA : (localStorage.getItem('msg_template') || MSG_PADRAO);
+  const pixChave = localStorage.getItem('pix_chave') || '(configure no Painel)';
+  const pixNome  = localStorage.getItem('pix_nome') || '(configure no Painel)';
+  const pixBanco = localStorage.getItem('pix_banco') || '(configure no Painel)';
   return tpl
     .replace(/{nome}/g, dados.nome || '?')
     .replace(/{box}/g, dados.box || '?')
     .replace(/{setor}/g, dados.setor || '?')
     .replace(/{status}/g, dados.status || 'PAGO')
-    .replace(/{taxa}/g, dados.taxa || '?');
+    .replace(/{taxa}/g, dados.taxa || '?')
+    .replace(/{pix_chave}/g, pixChave)
+    .replace(/{pix_nome}/g, pixNome)
+    .replace(/{pix_banco}/g, pixBanco);
 }
 
 function showDone(ok, err) {
