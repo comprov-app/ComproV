@@ -707,14 +707,14 @@ function gerarMiniatura(file, index) {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const TAMANHO_MAX = 150; // miniatura pequena, suficiente para visualização na grade
+      const TAMANHO_MAX = 220; // miniatura um pouco maior, ainda leve o suficiente para não travar
       const canvas = document.createElement('canvas');
       const escala = Math.min(1, TAMANHO_MAX / Math.max(img.width, img.height));
       canvas.width = Math.round(img.width * escala);
       canvas.height = Math.round(img.height * escala);
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      imgEl.src = canvas.toDataURL('image/jpeg', 0.6);
+      imgEl.src = canvas.toDataURL('image/jpeg', 0.75);
       URL.revokeObjectURL(url);
       resolve();
     };
