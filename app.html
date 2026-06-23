@@ -194,7 +194,7 @@
   <!-- ========== PAINEL ========== -->
   <div class="section" id="sec-painel">
     <div class="nav-tabs">
-      <button class="nav-tab active" onclick="showTab('tab-apis', this)">🔑 APIs</button>
+      <button class="nav-tab active" id="btn-tab-apis" onclick="showTab('tab-apis', this)">🔑 APIs</button>
       <button class="nav-tab" onclick="showTab('tab-mensagem', this)">💬 Mensagem</button>
       <button class="nav-tab" onclick="showTab('tab-loja', this)">🎨 Aparência</button>
       <button class="nav-tab" onclick="showTab('tab-plano', this)">📦 Plano</button>
@@ -449,6 +449,7 @@ function saveConfig() {
   localStorage.setItem('nome_loja',     document.getElementById('nome-loja').value.trim());
   localStorage.setItem('cor_loja',      document.getElementById('cor-hex').value.trim());
   aplicarAparencia();
+  atualizarVisibilidadeAbaApis();
   alert('✅ Configurações salvas!');
 }
 
@@ -472,6 +473,43 @@ function loadConfig() {
   document.getElementById('cor-picker').value        = localStorage.getItem('cor_loja') || '#3a3f44';
   aplicarAparencia();
   atualizarPreview();
+  atualizarVisibilidadeAbaApis();
+}
+
+// ===== OCULTAR ABA APIS: esconde quando configurado e funcionando, reaparece se der erro =====
+function todasChavesPreenchidas() {
+  return !!(
+    localStorage.getItem('anthropic_key') &&
+    localStorage.getItem('evo_server') &&
+    localStorage.getItem('evo_instance') &&
+    localStorage.getItem('evo_apikey')
+  );
+}
+
+function atualizarVisibilidadeAbaApis() {
+  const btn = document.getElementById('btn-tab-apis');
+  if (!btn) return;
+  const houveErroRecente = localStorage.getItem('apis_erro_recente') === '1';
+  const devesEsconder = todasChavesPreenchidas() && !houveErroRecente;
+  btn.style.display = devesEsconder ? 'none' : 'block';
+
+  // Se a aba APIs estava sendo exibida e agora foi escondida, troca para "Mensagem"
+  // pra não deixar a tela em branco
+  const tabApisVisivel = document.getElementById('tab-apis').style.display !== 'none';
+  if (devesEsconder && tabApisVisivel) {
+    const btnMensagem = document.querySelector('.nav-tab[onclick*="tab-mensagem"]');
+    if (btnMensagem) showTab('tab-mensagem', btnMensagem);
+  }
+}
+
+function marcarErroDeApi() {
+  localStorage.setItem('apis_erro_recente', '1');
+  atualizarVisibilidadeAbaApis();
+}
+
+function limparErroDeApi() {
+  localStorage.removeItem('apis_erro_recente');
+  atualizarVisibilidadeAbaApis();
 }
 
 function aplicarAparencia() {
@@ -949,6 +987,7 @@ async function startProcessing() {
       updateItem(i, dados.nome, `${dados.telefone} · ✓ Enviado`, 'Enviado', 'badge-ok');
       dadosLidos.push({ ...dados, file: selectedFiles[i], previewUrl: items[i].previewUrl, sucesso: true });
       incrementarUsoMensal(1);
+      limparErroDeApi();
       ok++;
     } catch(e) {
       updateItem(i, (dadosParciais && dadosParciais.nome) || selectedFiles[i].name, 'Erro: ' + e.message, 'Erro', 'badge-err');
@@ -960,6 +999,15 @@ async function startProcessing() {
         previewUrl: items[i].previewUrl,
         erro: e.message
       });
+      // Erros de chave/autenticação reabrem a aba APIs automaticamente para corrigir.
+      // Erros de leitura (ex: telefone não encontrado na etiqueta) não significam chave errada.
+      const msgErro = (e.message || '').toLowerCase();
+      const pareceErroDeChave = msgErro.includes('401') || msgErro.includes('403') ||
+        msgErro.includes('invalid') || msgErro.includes('unauthorized') ||
+        msgErro.includes('api key') || msgErro.includes('apikey') ||
+        msgErro.includes('instance') || msgErro.includes('not found') ||
+        msgErro.includes('failed to fetch') || msgErro.includes('404');
+      if (pareceErroDeChave) marcarErroDeApi();
       err++;
     }
     updateProgress(i+1, selectedFiles.length);
