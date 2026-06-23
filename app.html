@@ -205,8 +205,8 @@
 
 <div class="topbar" id="topbar">
   <div>
-    <h1 id="nome-loja-topbar">Minha Loja</h1>
-    <span>Comprovante WhatsApp</span>
+    <h1>ComproV</h1>
+    <span>Envio de Comprovantes</span>
   </div>
   <div class="topbar-btns">
     <button class="topbar-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Alternar modo noturno">🌙</button>
@@ -316,10 +316,6 @@
     <!-- ABA APARÊNCIA -->
     <div id="tab-loja" style="display:none">
       <div class="card">
-        <div class="card-title">🏪 Dados da loja</div>
-        <label>Nome da loja</label>
-        <input type="text" id="nome-loja" placeholder="Minha Loja" />
-        <div class="divider"></div>
         <div class="card-title">🎨 Cor principal</div>
         <div class="color-picker-row">
           <label for="cor-picker" class="color-preview-wrap" title="Toque para escolher a cor">
@@ -475,7 +471,6 @@ function saveConfig() {
   localStorage.setItem('pix_chave',     document.getElementById('pix-chave').value.trim());
   localStorage.setItem('pix_nome',      document.getElementById('pix-nome').value.trim());
   localStorage.setItem('pix_banco',     document.getElementById('pix-banco').value.trim());
-  localStorage.setItem('nome_loja',     document.getElementById('nome-loja').value.trim());
   localStorage.setItem('cor_loja',      document.getElementById('cor-hex').value.trim());
   aplicarAparencia();
   atualizarVisibilidadeAbaApis();
@@ -497,7 +492,6 @@ function loadConfig() {
   document.getElementById('pix-banco').value         = localStorage.getItem('pix_banco') || '';
   document.getElementById('limite-mensal').value     = localStorage.getItem('limite_mensal') || '';
   atualizarResumoUsoMensal();
-  document.getElementById('nome-loja').value         = localStorage.getItem('nome_loja') || "Minha Loja";
   document.getElementById('cor-hex').value           = localStorage.getItem('cor_loja') || '#3a3f44';
   document.getElementById('cor-picker').value        = localStorage.getItem('cor_loja') || '#3a3f44';
   aplicarAparencia();
@@ -543,9 +537,7 @@ function limparErroDeApi() {
 
 function aplicarAparencia() {
   const cor = localStorage.getItem('cor_loja') || '#3a3f44';
-  const nome = localStorage.getItem('nome_loja') || "Minha Loja";
   document.documentElement.style.setProperty('--cor-loja', cor);
-  document.getElementById('nome-loja-topbar').textContent = nome;
   const metaTheme = document.getElementById('meta-theme-color');
   if (metaTheme) metaTheme.setAttribute('content', cor);
 }
