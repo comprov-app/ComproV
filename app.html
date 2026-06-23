@@ -332,20 +332,22 @@
     <!-- ABA PLANO -->
     <div id="tab-plano" style="display:none">
       <div class="card">
-        <div class="card-title">📦 Limite de envios mensal</div>
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div class="card-title" style="margin-bottom:0;">📦 Limite de envios mensal</div>
+          <button id="btn-lapis-limite" onclick="destrancarLimite()" style="display:none; background:none; border:none; cursor:pointer; font-size:18px; padding:4px 8px; line-height:1; border-radius:8px;" title="Editar limite">✏️</button>
+        </div>
 
         <!-- Visualização travada (limite já definido) -->
-        <div id="limite-travado-view" style="display:none;">
+        <div id="limite-travado-view" style="display:none; margin-top:12px;">
           <div style="text-align:center; padding:12px 0;">
             <div style="font-size:13px; color:var(--text-secondary); margin-bottom:4px;">Limite atual do plano</div>
             <div style="font-size:28px; font-weight:700; color:var(--text-primary);" id="limite-travado-valor">150</div>
             <div style="font-size:12px; color:var(--text-secondary);">comprovantes por mês</div>
           </div>
-          <button class="btn btn-gray" onclick="destrancarLimite()">✏️ Editar limite</button>
         </div>
 
         <!-- Visualização editável (sem limite ainda, ou após destrancar) -->
-        <div id="limite-edicao-view">
+        <div id="limite-edicao-view" style="margin-top:12px;">
           <label>Limite mensal de envios</label>
           <input type="text" id="limite-mensal" placeholder="ilimitado" inputmode="numeric" />
           <button class="btn btn-green" onclick="salvarLimiteMensal()">💾 Salvar limite</button>
@@ -979,14 +981,17 @@ function atualizarResumoUsoMensal() {
   // Decide qual view mostrar: travada (já tem limite configurado) ou edição (primeira vez)
   const travadaView = document.getElementById('limite-travado-view');
   const edicaoView = document.getElementById('limite-edicao-view');
+  const btnLapis = document.getElementById('btn-lapis-limite');
   if (travadaView && edicaoView) {
     if (limiteJaFoiDefinido()) {
       document.getElementById('limite-travado-valor').textContent = limite ? limite : 'Ilimitado';
       travadaView.style.display = 'block';
       edicaoView.style.display = 'none';
+      if (btnLapis) btnLapis.style.display = 'block';
     } else {
       travadaView.style.display = 'none';
       edicaoView.style.display = 'block';
+      if (btnLapis) btnLapis.style.display = 'none';
     }
   }
 }
