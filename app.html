@@ -184,6 +184,21 @@
     width: 100%; border-radius: 12px; background: #000; max-height: 320px; object-fit: cover;
   }
   .qr-modal-status { font-size: 13px; color: var(--text-secondary); margin: 12px 0; min-height: 18px; }
+  .foto-fullscreen-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 2100;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    padding: 20px;
+  }
+  .foto-fullscreen-img { max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px; }
+  .foto-fullscreen-fechar {
+    position: absolute; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,0.15); color: #fff; border: none; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .foto-fullscreen-nome {
+    color: #ddd; font-size: 13px; margin-bottom: 12px; text-align: center; max-width: 90%;
+    word-break: break-word;
+  }
 </style>
 </head>
 <body>
@@ -677,7 +692,7 @@ function renderThumbGrid() {
   selectedFiles.forEach((f, i) => {
     htmlPartes.push(`
       <div class="thumb" id="thumb-item-${i}">
-        <img id="thumb-img-${i}" src="" loading="lazy">
+        <img id="thumb-img-${i}" src="" loading="lazy" onclick="abrirFotoEmTelaCheia(${i})" style="cursor:pointer;">
         <span class="num">${i+1}</span>
         <button class="remover" onclick="removerFoto(${i})" title="Remover esta foto">✕</button>
       </div>`);
@@ -697,6 +712,32 @@ async function gerarMiniaturasEmLotes() {
     // Pequena pausa entre lotes para o navegador "respirar" e não travar a interface
     await new Promise(resolve => setTimeout(resolve, 0));
   }
+}
+
+// Abre a foto original (não a miniatura reduzida) em tela cheia para conferência
+function abrirFotoEmTelaCheia(index) {
+  const file = selectedFiles[index];
+  if (!file) return;
+
+  const url = URL.createObjectURL(file);
+  const overlay = document.createElement('div');
+  overlay.className = 'foto-fullscreen-overlay';
+  overlay.innerHTML = `
+    <button class="foto-fullscreen-fechar" id="foto-fechar">✕</button>
+    <div class="foto-fullscreen-nome">${index + 1} de ${selectedFiles.length} · ${file.name}</div>
+    <img src="${url}" class="foto-fullscreen-img" />
+  `;
+  document.body.appendChild(overlay);
+
+  function fechar() {
+    URL.revokeObjectURL(url);
+    overlay.remove();
+  }
+
+  overlay.querySelector('#foto-fechar').addEventListener('click', fechar);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) fechar();
+  });
 }
 
 function gerarMiniatura(file, index) {
