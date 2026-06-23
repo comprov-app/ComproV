@@ -172,7 +172,20 @@
   .switch input:checked + .switch-track { background-color:#1D9E75; }
   .switch input:checked + .switch-track::before { transform:translateX(22px); }
   .divider { height:1px; background: var(--row-border); margin:12px 0; }
+  .qr-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .qr-modal-box {
+    background: var(--card-bg); border-radius: 16px; padding: 20px; max-width: 360px; width: 100%;
+    text-align: center;
+  }
+  .qr-modal-box video {
+    width: 100%; border-radius: 12px; background: #000; max-height: 320px; object-fit: cover;
+  }
+  .qr-modal-status { font-size: 13px; color: var(--text-secondary); margin: 12px 0; min-height: 18px; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 </head>
 <body>
 
@@ -845,31 +858,97 @@ function salvarLimiteMensal() {
 
 const SENHA_ADMIN_LIMITE = '6DOfJ9cv6RQJ\\7vP.e{6|RMZX7£1\\o';
 
-function destrancarLimite() {
-  const senhaDigitada = prompt('Digite a senha de administrador para editar o limite mensal:');
-  if (senhaDigitada === null) return; // cancelou
-  if (senhaDigitada !== SENHA_ADMIN_LIMITE) {
-    alert('❌ Senha incorreta. A edição do limite permanece bloqueada.');
+// Abre a câmera, lê um QR Code e chama callback(true) se o conteúdo lido
+// for igual à senha de administrador, ou callback(false) se cancelar/falhar.
+function abrirLeitorQrAdmin(callback) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert('Este dispositivo/navegador não tem suporte à câmera. Não é possível ler o QR Code.');
+    callback(false);
     return;
   }
-  document.getElementById('limite-travado-view').style.display = 'none';
-  document.getElementById('limite-edicao-view').style.display = 'block';
-  document.getElementById('limite-mensal').value = localStorage.getItem('limite_mensal') || '';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'qr-modal-overlay';
+  overlay.innerHTML = `
+    <div class="qr-modal-box">
+      <p style="font-weight:600; font-size:15px; margin-bottom:8px; color:var(--text-primary);">📷 Escaneie o QR Code de administrador</p>
+      <video id="qr-video" playsinline muted></video>
+      <div class="qr-modal-status" id="qr-status">Apontando câmera para o QR Code...</div>
+      <button class="btn btn-gray" id="qr-cancelar">Cancelar</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const video = overlay.querySelector('#qr-video');
+  const statusEl = overlay.querySelector('#qr-status');
+  let stream = null;
+  let pararLeitura = false;
+
+  function encerrar(resultado) {
+    pararLeitura = true;
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    overlay.remove();
+    callback(resultado);
+  }
+
+  overlay.querySelector('#qr-cancelar').addEventListener('click', () => encerrar(false));
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then((mediaStream) => {
+      stream = mediaStream;
+      video.srcObject = stream;
+      video.play();
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+      function tick() {
+        if (pararLeitura) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const codigo = window.jsQR ? jsQR(imageData.data, imageData.width, imageData.height) : null;
+          if (codigo && codigo.data) {
+            if (codigo.data === SENHA_ADMIN_LIMITE) {
+              statusEl.textContent = '✅ QR Code válido!';
+              setTimeout(() => encerrar(true), 400);
+              return;
+            } else {
+              statusEl.textContent = '❌ QR Code inválido. Tente novamente.';
+            }
+          }
+        }
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })
+    .catch((err) => {
+      statusEl.textContent = '❌ Não foi possível acessar a câmera: ' + err.message;
+      setTimeout(() => encerrar(false), 1500);
+    });
+}
+
+function destrancarLimite() {
+  abrirLeitorQrAdmin((autorizado) => {
+    if (!autorizado) return;
+    document.getElementById('limite-travado-view').style.display = 'none';
+    document.getElementById('limite-edicao-view').style.display = 'block';
+    document.getElementById('limite-mensal').value = localStorage.getItem('limite_mensal') || '';
+  });
 }
 
 function resetarContadorMensal() {
-  const senhaDigitada = prompt('Digite a senha de administrador para resetar o contador deste mês:');
-  if (senhaDigitada === null) return; // cancelou
-  if (senhaDigitada !== SENHA_ADMIN_LIMITE) {
-    alert('❌ Senha incorreta. O contador permanece como está.');
-    return;
-  }
-  if (confirm('Resetar o contador de uso deste mês para 0?')) {
-    localStorage.setItem('uso_mensal_mes', obterMesAtual());
-    localStorage.setItem('uso_mensal_contador', '0');
-    atualizarResumoUsoMensal();
-    alert('✅ Contador resetado!');
-  }
+  abrirLeitorQrAdmin((autorizado) => {
+    if (!autorizado) return;
+    if (confirm('Resetar o contador de uso deste mês para 0?')) {
+      localStorage.setItem('uso_mensal_mes', obterMesAtual());
+      localStorage.setItem('uso_mensal_contador', '0');
+      atualizarResumoUsoMensal();
+      alert('✅ Contador resetado!');
+    }
+  });
 }
 
 function atualizarResumoUsoMensal() {
