@@ -216,6 +216,11 @@
         <label>API Key</label>
         <input type="password" id="evo-apikey" placeholder="91635C7604D9-4FC1-BCF7-4D9B3E0658FB" autocomplete="off" data-lpignore="true" data-1p-ignore />
       </div>
+      <button class="btn btn-green" onclick="saveConfig()">💾 Salvar configurações</button>
+    </div>
+
+    <!-- ABA MENSAGEM -->
+    <div id="tab-mensagem" style="display:none">
       <div class="card">
         <div class="card-title">⏱️ Intervalo entre envios</div>
         <div class="alert alert-info">O app calcula o intervalo automaticamente pela quantidade de etiquetas: até 20 → 4s · até 50 → 6s · mais de 50 → 10s. Toque em "Automático" para usar esse cálculo, ou escolha um tempo fixo.</div>
@@ -230,11 +235,6 @@
         <label>Ou digite um tempo específico (segundos) <span class="label-hint">deixe "auto" para calcular sozinho</span></label>
         <input type="text" id="intervalo-envio" placeholder="auto" inputmode="numeric" />
       </div>
-      <button class="btn btn-green" onclick="saveConfig()">💾 Salvar configurações</button>
-    </div>
-
-    <!-- ABA MENSAGEM -->
-    <div id="tab-mensagem" style="display:none">
       <div class="card">
         <div class="card-title">💬 Texto da mensagem</div>
         <div class="alert alert-info" style="margin-bottom:12px;">
