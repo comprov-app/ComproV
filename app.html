@@ -1252,7 +1252,11 @@ async function lerEtiqueta(file, apiKey) {
   if (!resp.ok) throw new Error('Claude erro ' + resp.status);
   const data = await resp.json();
   const text = data.content.map(c => c.text||'').join('').replace(/```json|```/g,'').trim();
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error('A IA não conseguiu ler esta etiqueta corretamente. Tente novamente ou use uma foto mais nítida.');
+  }
 }
 
 async function enviarFoto(file, dados, serverUrl, instanceName, apiKey) {
@@ -1299,12 +1303,17 @@ function montarMensagem(dados) {
   const pixChave = localStorage.getItem('pix_chave') || '(configure no Painel)';
   const pixNome  = localStorage.getItem('pix_nome') || '(configure no Painel)';
   const pixBanco = localStorage.getItem('pix_banco') || '(configure no Painel)';
+  // Garante 2 casas decimais sempre (evita "R$ 5" em vez de "R$ 5,00" quando o valor
+  // vem do campo manual de "cobrar taxa de todos", digitado sem decimais)
+  let taxaFormatada = dados.taxa || '?';
+  const taxaNum = parseFloat(String(dados.taxa).replace(',', '.'));
+  if (!isNaN(taxaNum)) taxaFormatada = taxaNum.toFixed(2);
   return tpl
     .replace(/{nome}/g, dados.nome || '?')
     .replace(/{box}/g, dados.box || '?')
     .replace(/{setor}/g, dados.setor || '?')
     .replace(/{status}/g, dados.status || 'PAGO')
-    .replace(/{taxa}/g, dados.taxa || '?')
+    .replace(/{taxa}/g, taxaFormatada)
     .replace(/{pix_chave}/g, pixChave)
     .replace(/{pix_nome}/g, pixNome)
     .replace(/{pix_banco}/g, pixBanco);
