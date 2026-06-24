@@ -73,8 +73,9 @@
   .btn-gray { background: var(--gray-bg); color: var(--gray-text); }
   .btn-red { background: #dc3545; color: #fff; }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .upload-area { border: 2px dashed #c8e6d8; border-radius: 12px; padding: 28px 16px; text-align: center; cursor: pointer; background: #f0faf6; transition: border-color .2s; }
+  .upload-area { border: 2px dashed #c8e6d8; border-radius: 12px; padding: 28px 16px; text-align: center; cursor: pointer; background: #f0faf6; transition: border-color .2s, background .2s; }
   .upload-area:hover { border-color: var(--cor-loja, #3a3f44); }
+  .upload-area.drag-ativo { border-color: var(--cor-loja, #3a3f44); background: #e2f5ec; border-style: solid; }
   .upload-area .icon { font-size: 40px; margin-bottom: 8px; }
   .upload-area p { font-size: 14px; font-weight: 600; color: var(--cor-loja, #3a3f44); }
   .upload-area span { font-size: 12px; color: #888; }
@@ -400,10 +401,10 @@
     <div class="card">
       <div class="card-title">📸 Selecionar fotos</div>
       <div class="alert alert-info">O sistema lê cada etiqueta e envia a foto + mensagem direto no WhatsApp do cliente!</div>
-      <div class="upload-area" onclick="document.getElementById('file-input').click()">
+      <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
         <div class="icon">📸</div>
         <p>Toque para selecionar as fotos</p>
-        <span>Pode selecionar várias de uma vez</span>
+        <span>Pode selecionar várias de uma vez, ou arrastar para aqui</span>
       </div>
       <input type="file" id="file-input" accept="image/*" multiple onchange="onFilesSelected(this.files)">
       <div id="aviso-taxa-todos" class="alert alert-warn" style="display:none; margin-top:12px;"></div>
@@ -670,6 +671,45 @@ function onFilesSelected(files) {
   document.getElementById('btn-send').disabled = selectedFiles.length === 0;
   atualizarAvisoIntervalo();
 }
+
+// ===== DRAG AND DROP: permite arrastar fotos do computador direto para a área de upload =====
+// Útil principalmente no PC, onde não existe seletor de "Galeria" como no celular.
+(function configurarDragAndDrop() {
+  const area = document.getElementById('upload-area');
+  if (!area) return;
+
+  ['dragenter', 'dragover'].forEach(evento => {
+    area.addEventListener(evento, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      area.classList.add('drag-ativo');
+    });
+  });
+
+  ['dragleave', 'dragend'].forEach(evento => {
+    area.addEventListener(evento, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      area.classList.remove('drag-ativo');
+    });
+  });
+
+  area.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    area.classList.remove('drag-ativo');
+
+    const arquivosSoltos = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (arquivosSoltos.length === 0) return;
+
+    // Acrescenta às fotos já selecionadas, em vez de substituir — mesmo comportamento
+    // esperado de quem está organizando um lote grande aos poucos
+    selectedFiles = selectedFiles.concat(arquivosSoltos);
+    renderThumbGrid();
+    document.getElementById('btn-send').disabled = selectedFiles.length === 0;
+    atualizarAvisoIntervalo();
+  });
+})();
 
 // ===== COMPARTILHAMENTO: recebe fotos compartilhadas de outros apps (Galeria, Google Fotos, etc) =====
 async function verificarFotosCompartilhadas() {
