@@ -157,6 +157,13 @@
   }
   .tag-hint { display:inline-block; background: var(--tag-bg); border-radius:4px; padding:2px 6px; font-size:11px; color: var(--tag-text); margin:2px; cursor:pointer; border:1px solid var(--tag-border); }
   .tag-hint:hover { filter: brightness(1.2); }
+  .plano-btn {
+    display:inline-block; background: var(--tag-bg); border-radius:10px; padding:14px 18px;
+    font-size:15px; font-weight:600; color: var(--tag-text); margin:0; cursor:pointer;
+    border:1.5px solid var(--tag-border); flex:1; text-align:center; min-width:90px;
+  }
+  .plano-btn:hover { filter: brightness(1.2); }
+  .plano-btn:active { transform: scale(0.97); }
   .switch-row { display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; }
   .switch-row .switch-label { font-size:14px; color:var(--text-primary); font-weight:500; }
   .switch { position:relative; display:inline-block; width:48px; height:26px; flex-shrink:0; }
@@ -363,9 +370,9 @@
         <div id="limite-edicao-view" style="margin-top:12px;">
           <label>Plano <span class="label-hint">toque para preencher o limite automaticamente</span></label>
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-            <span class="tag-hint" onclick="setLimitePlano(250)">Básico</span>
-            <span class="tag-hint" onclick="setLimitePlano(500)">Intermediário</span>
-            <span class="tag-hint" onclick="setLimitePlano(1000)">Avançado</span>
+            <span class="plano-btn" onclick="setLimitePlano(250)">Básico</span>
+            <span class="plano-btn" onclick="setLimitePlano(500)">Intermediário</span>
+            <span class="plano-btn" onclick="setLimitePlano(1000)">Avançado</span>
           </div>
           <label>Limite mensal de envios <span class="label-hint">digite 0 para ilimitado</span></label>
           <input type="text" id="limite-mensal" placeholder="0 = ilimitado" inputmode="numeric" />
@@ -1769,7 +1776,7 @@ if (lotePendente) {
 // ===== PWA: registro do service worker e aviso de atualização =====
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').then((reg) => {
+    navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' }).then((reg) => {
 
       // Verifica se já tem uma versão nova esperando
       if (reg.waiting) {
@@ -1786,8 +1793,8 @@ if ('serviceWorker' in navigator) {
         });
       });
 
-      // Verifica por atualizações a cada 60 segundos enquanto o app está aberto
-      setInterval(() => reg.update(), 60000);
+      // Verifica por atualizações a cada 15 segundos enquanto o app está aberto
+      setInterval(() => reg.update(), 15000);
     }).catch((err) => console.log('Erro ao registrar service worker:', err));
 
     // Quando o novo service worker assume o controle, recarrega a página
