@@ -1101,6 +1101,43 @@ function salvarLimiteMensal() {
 
 const SENHA_ADMIN_LIMITE = '6DOfJ9cv6RQJ\\7vP.e{6|RMZX7£1\\o';
 
+// Fallback para navegadores sem suporte a BarcodeDetector (ex: Safari/iOS).
+// Em vez de escanear o QR Code pela câmera, permite digitar a senha de administrador
+// manualmente — mesma proteção, caminho diferente, garantindo que o recurso funcione em todo dispositivo.
+function abrirEntradaSenhaManual(callback) {
+  const overlay = document.createElement('div');
+  overlay.className = 'qr-modal-overlay';
+  overlay.innerHTML = `
+    <div class="qr-modal-box">
+      <p style="font-size:14px; color:var(--text-primary); margin-bottom:12px;">Digite a senha de administrador:</p>
+      <input type="password" id="senha-manual-input" placeholder="Senha" autocomplete="off" data-lpignore="true" data-1p-ignore style="margin-bottom:14px;" />
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-gray" id="senha-manual-cancelar" style="flex:1;">Cancelar</button>
+        <button class="btn btn-green" id="senha-manual-confirmar" style="flex:1;">Confirmar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const inputEl = overlay.querySelector('#senha-manual-input');
+  setTimeout(() => inputEl.focus(), 100);
+
+  function confirmar() {
+    const valor = inputEl.value;
+    overlay.remove();
+    if (valor === SENHA_ADMIN_LIMITE) {
+      callback(true);
+    } else {
+      mostrarAvisoCustomizado('Senha incorreta.', '❌');
+      callback(false);
+    }
+  }
+
+  overlay.querySelector('#senha-manual-confirmar').addEventListener('click', confirmar);
+  overlay.querySelector('#senha-manual-cancelar').addEventListener('click', () => { overlay.remove(); callback(false); });
+  inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirmar(); });
+}
+
 // Abre a câmera, lê um QR Code e chama callback(true) se o conteúdo lido
 // for igual à senha de administrador, ou callback(false) se cancelar/falhar.
 function abrirLeitorQrAdmin(callback) {
@@ -1111,8 +1148,7 @@ function abrirLeitorQrAdmin(callback) {
   }
 
   if (!('BarcodeDetector' in window)) {
-    mostrarAvisoCustomizado('Este navegador não tem suporte nativo à leitura de QR Code. Tente pelo Chrome atualizado no Android.', '🚫');
-    callback(false);
+    abrirEntradaSenhaManual(callback);
     return;
   }
 
