@@ -355,6 +355,7 @@
             <div style="font-size:13px; color:var(--text-secondary); margin-bottom:4px;">Limite atual do plano</div>
             <div style="font-size:28px; font-weight:700; color:var(--text-primary);" id="limite-travado-valor">150</div>
             <div style="font-size:12px; color:var(--text-secondary);">comprovantes por mês</div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:8px;" id="ciclo-travado-info"></div>
           </div>
         </div>
 
@@ -362,6 +363,8 @@
         <div id="limite-edicao-view" style="margin-top:12px;">
           <label>Limite mensal de envios <span class="label-hint">digite 0 para ilimitado</span></label>
           <input type="text" id="limite-mensal" placeholder="0 = ilimitado" inputmode="numeric" />
+          <label>Dia do ciclo de cobrança <span class="label-hint">dia em que o cliente assinou</span></label>
+          <input type="text" id="dia-ciclo" placeholder="ex: 12" inputmode="numeric" />
           <button class="btn btn-green" onclick="salvarLimiteMensal()">💾 Salvar limite</button>
         </div>
       </div>
@@ -945,17 +948,56 @@ function verificarLotePendente() {
   }
 }
 
-// ===== LIMITE MENSAL: contador de envios que reseta todo dia 1 =====
-function obterMesAtual() {
-  const agora = new Date();
-  return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
+// ===== LIMITE MENSAL: contador de envios que reseta no dia de assinatura de cada cliente =====
+function obterDiaCiclo() {
+  const dia = parseInt(localStorage.getItem('dia_ciclo') || '1', 10);
+  return (isNaN(dia) || dia < 1 || dia > 31) ? 1 : dia;
+}
+
+// Calcula a data de início do ciclo atual (o "dia de assinatura" mais recente que já passou,
+// incluindo hoje). Isso identifica de forma estável em qual ciclo estamos, sem precisar
+// de um relógio rodando — só compara com a data de hoje a cada verificação.
+function obterIdentificadorCicloAtual() {
+  const diaCiclo = obterDiaCiclo();
+  const hoje = new Date();
+  let anoCiclo = hoje.getFullYear();
+  let mesCiclo = hoje.getMonth(); // 0-indexado
+
+  // Se o dia de hoje ainda não chegou no dia do ciclo deste mês,
+  // o ciclo atual começou no mês anterior
+  if (hoje.getDate() < diaCiclo) {
+    mesCiclo -= 1;
+    if (mesCiclo < 0) { mesCiclo = 11; anoCiclo -= 1; }
+  }
+
+  return `${anoCiclo}-${String(mesCiclo + 1).padStart(2, '0')}`;
+}
+
+// Calcula a próxima data em que o ciclo vai renovar (formato dd/mm/aaaa para exibição)
+function calcularProximaRenovacao(diaCiclo) {
+  const hoje = new Date();
+  let anoProx = hoje.getFullYear();
+  let mesProx = hoje.getMonth();
+
+  // Se o dia do ciclo deste mês já passou (ou é hoje), a próxima renovação é no mês seguinte
+  if (hoje.getDate() >= diaCiclo) {
+    mesProx += 1;
+    if (mesProx > 11) { mesProx = 0; anoProx += 1; }
+  }
+
+  // Ajusta para o último dia do mês caso o dia configurado não exista nele (ex: dia 31 em fevereiro)
+  const ultimoDiaDoMes = new Date(anoProx, mesProx + 1, 0).getDate();
+  const diaFinal = Math.min(diaCiclo, ultimoDiaDoMes);
+
+  const dataRenovacao = new Date(anoProx, mesProx, diaFinal);
+  return dataRenovacao.toLocaleDateString('pt-BR');
 }
 
 function verificarResetMensal() {
-  const mesSalvo = localStorage.getItem('uso_mensal_mes');
-  const mesAtual = obterMesAtual();
-  if (mesSalvo !== mesAtual) {
-    localStorage.setItem('uso_mensal_mes', mesAtual);
+  const cicloSalvo = localStorage.getItem('uso_mensal_mes');
+  const cicloAtual = obterIdentificadorCicloAtual();
+  if (cicloSalvo !== cicloAtual) {
+    localStorage.setItem('uso_mensal_mes', cicloAtual);
     localStorage.setItem('uso_mensal_contador', '0');
   }
 }
@@ -1026,7 +1068,16 @@ function salvarLimiteMensal() {
     mostrarAvisoCustomizado('Digite um número de limite, ou 0 se não quiser restringir (ilimitado).', '⚠️');
     return;
   }
+  const diaTexto = document.getElementById('dia-ciclo').value.trim();
+  const diaNum = parseInt(diaTexto, 10);
+  if (diaTexto === '' || isNaN(diaNum) || diaNum < 1 || diaNum > 31) {
+    mostrarAvisoCustomizado('Digite um dia válido (entre 1 e 31) para o ciclo de cobrança — o dia em que o cliente assinou.', '⚠️');
+    return;
+  }
   localStorage.setItem('limite_mensal', limiteTexto);
+  localStorage.setItem('dia_ciclo', String(diaNum));
+  // Reavalia o ciclo imediatamente com o novo dia configurado, evitando contagem incorreta
+  verificarResetMensal();
   atualizarResumoUsoMensal();
   mostrarAvisoCustomizado('Limite salvo!', '✅');
 }
@@ -1118,6 +1169,7 @@ function destrancarLimite() {
     document.getElementById('limite-edicao-view').style.display = 'block';
     const valorSalvo = localStorage.getItem('limite_mensal') || '';
     document.getElementById('limite-mensal').value = (valorSalvo === 'ilimitado') ? '0' : valorSalvo;
+    document.getElementById('dia-ciclo').value = localStorage.getItem('dia_ciclo') || '';
   });
 }
 
@@ -1126,7 +1178,7 @@ function resetarContadorMensal() {
     if (!autorizado) return;
     confirmarCustomizado('Resetar o contador de uso deste mês para 0?', (confirmou) => {
       if (confirmou) {
-        localStorage.setItem('uso_mensal_mes', obterMesAtual());
+        localStorage.setItem('uso_mensal_mes', obterIdentificadorCicloAtual());
         localStorage.setItem('uso_mensal_contador', '0');
         atualizarResumoUsoMensal();
         mostrarAvisoCustomizado('Contador resetado!', '✅');
@@ -1159,12 +1211,18 @@ function atualizarResumoUsoMensal() {
   const travadaView = document.getElementById('limite-travado-view');
   const edicaoView = document.getElementById('limite-edicao-view');
   const btnLapis = document.getElementById('btn-lapis-limite');
+  const cicloInfoEl = document.getElementById('ciclo-travado-info');
   if (travadaView && edicaoView) {
     if (limiteJaFoiDefinido()) {
       document.getElementById('limite-travado-valor').textContent = limite ? limite : 'Ilimitado';
       travadaView.style.display = 'block';
       edicaoView.style.display = 'none';
       if (btnLapis) btnLapis.style.display = 'block';
+      if (cicloInfoEl) {
+        const diaCiclo = obterDiaCiclo();
+        const proximaRenovacao = calcularProximaRenovacao(diaCiclo);
+        cicloInfoEl.textContent = `🔄 Ciclo renova todo dia ${diaCiclo} · próxima: ${proximaRenovacao}`;
+      }
     } else {
       travadaView.style.display = 'none';
       edicaoView.style.display = 'block';
