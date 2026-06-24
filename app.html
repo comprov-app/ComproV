@@ -1103,9 +1103,8 @@ function abrirLeitorQrAdmin(callback) {
   overlay.className = 'qr-modal-overlay';
   overlay.innerHTML = `
     <div class="qr-modal-box">
-      <p style="font-weight:600; font-size:15px; margin-bottom:8px; color:var(--text-primary);">📷 Escaneie o QR Code de administrador</p>
       <video id="qr-video" playsinline muted></video>
-      <div class="qr-modal-status" id="qr-status">Apontando câmera para o QR Code...</div>
+      <div class="qr-modal-status" id="qr-status"></div>
       <button class="btn btn-gray" id="qr-cancelar">Cancelar</button>
     </div>
   `;
