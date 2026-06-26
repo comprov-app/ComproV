@@ -1937,7 +1937,7 @@ function toBase64(file) {
 }
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 function aplicarTema() {
-  const tema = localStorage.getItem('tema') || 'light';
+  const tema = localStorage.getItem('tema') || 'dark';
   if (tema === 'dark') {
     document.body.setAttribute('data-theme', 'dark');
     document.getElementById('theme-toggle-btn').textContent = '☀️';
@@ -1948,7 +1948,7 @@ function aplicarTema() {
 }
 
 function toggleTheme() {
-  const atual = localStorage.getItem('tema') || 'light';
+  const atual = localStorage.getItem('tema') || 'dark';
   const novo = atual === 'light' ? 'dark' : 'light';
   localStorage.setItem('tema', novo);
   aplicarTema();
