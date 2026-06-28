@@ -751,6 +751,22 @@ function resetMensagem() {
 function toggleCampoTaxaTodos() {
   const ativado = document.getElementById('taxa-todos-toggle').checked;
   document.getElementById('campo-taxa-todos-valor').style.display = ativado ? 'block' : 'none';
+
+  // Salva o estado na hora (Opcao A): ao DESLIGAR, ja desativa de verdade no mesmo instante,
+  // evitando cobrar taxa por engano caso esqueca de clicar em Salvar.
+  localStorage.setItem('taxa_todos_ativa', ativado ? '1' : '0');
+
+  if (!ativado) {
+    // Desligou: confirma visualmente que parou de cobrar
+    atualizarAvisoTaxaTodos();
+    mostrarAvisoCustomizado('Cobrança de taxa para todos desativada.', '✅');
+  } else {
+    // Ligou: lembra de preencher o valor (se ainda nao tiver)
+    const valorSalvo = (localStorage.getItem('taxa_todos_valor') || '').trim();
+    if (!valorSalvo) {
+      mostrarAvisoCustomizado('Cobrança ativada! Agora escolha ou digite o valor da taxa e clique em Salvar.', '💵');
+    }
+  }
 }
 
 // Clicou num botão de atalho (R$5 ou R$10): preenche o campo e destaca o botão
