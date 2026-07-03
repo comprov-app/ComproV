@@ -1234,13 +1234,50 @@ function updateProgress(done, total) {
 function renderItems(items) {
   document.getElementById('items-list').innerHTML = items.map((it, i) => `
     <div class="item-row">
-      <img class="item-thumb" src="${it.previewUrl}" loading="lazy" />
+      <img class="item-thumb" id="item-thumb-${i}" src="" loading="lazy" />
       <div class="item-info">
         <div class="name" id="iname-${i}">${escHtml(it.file.name)}</div>
         <div class="detail" id="idetail-${i}">Aguardando...</div>
       </div>
       <span class="badge badge-wait" id="ibadge-${i}">Fila</span>
     </div>`).join('');
+  // Gera as miniaturas comprimidas em segundo plano, em pequenos lotes, para não
+  // sobrecarregar a memória do celular com todas as fotos inteiras de uma vez.
+  // É isso que evita o travamento/tela preta ao rolar durante um lote grande.
+  gerarMiniaturasDaFila(items);
+}
+
+// Gera miniaturas leves (redimensionadas) para a lista da fila, em lotes de 4 por vez,
+// liberando a memória de cada foto original assim que a miniatura é criada.
+async function gerarMiniaturasDaFila(items) {
+  const TAMANHO_LOTE = 4;
+  for (let i = 0; i < items.length; i += TAMANHO_LOTE) {
+    const lote = items.slice(i, i + TAMANHO_LOTE);
+    await Promise.all(lote.map((it, idx) => gerarMiniaturaFila(it.file, i + idx)));
+  }
+}
+
+function gerarMiniaturaFila(file, index) {
+  return new Promise((resolve) => {
+    const imgEl = document.getElementById('item-thumb-' + index);
+    if (!imgEl) { resolve(); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const TAMANHO_MAX = 120; // miniatura pequena na fila: leve, evita travar a rolagem
+      const canvas = document.createElement('canvas');
+      const escala = Math.min(1, TAMANHO_MAX / Math.max(img.width, img.height));
+      canvas.width = Math.round(img.width * escala);
+      canvas.height = Math.round(img.height * escala);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      imgEl.src = canvas.toDataURL('image/jpeg', 0.7);
+      URL.revokeObjectURL(url); // Libera a foto original da memória imediatamente
+      resolve();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+    img.src = url;
+  });
 }
 
 function updateItem(i, nome, detail, badge, badgeClass) {
