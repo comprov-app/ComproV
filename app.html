@@ -126,6 +126,9 @@
   .plano-barra-grande { height: 10px; background: var(--gray-bg, #eee); border-radius: 999px; overflow: hidden; }
   .plano-barra-grande-fill { height: 100%; background: #2ecc71; border-radius: 999px; transition: width .5s ease; width: 0%; }
   .plano-pct { text-align: right; font-size: 11px; color: var(--text-tertiary); margin-top: 6px; font-weight: 600; }
+  .plano-renovacao { margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; background: var(--tab-bg, #f0f0ec); color: var(--text-secondary); }
+  .plano-renovacao.perto { background: #fff6e0; color: #b8860b; }
+  .plano-renovacao.vencido { background: #fdecea; color: #c0392b; }
 
   /* Seções repaginadas (aba mensagem) */
   .sec-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; padding: 18px; margin-bottom: 12px; }
@@ -444,6 +447,7 @@
           <div class="plano-barra-grande-fill" id="uso-mensal-barra"></div>
         </div>
         <div class="plano-pct" id="plano-pct"></div>
+        <div class="plano-renovacao" id="plano-renovacao"></div>
       </div>
     </div>
 
@@ -1452,6 +1456,24 @@ function calcularProximaRenovacao(diaCiclo) {
   return dataRenovacao.toLocaleDateString('pt-BR');
 }
 
+// Quantos dias faltam para a próxima renovação (0 = renova hoje). Usa a mesma lógica
+// de calcularProximaRenovacao, mas devolve o número de dias em vez da data formatada.
+function calcularDiasAteRenovacao(diaCiclo) {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  let anoProx = hoje.getFullYear();
+  let mesProx = hoje.getMonth();
+  if (hoje.getDate() >= diaCiclo) {
+    mesProx += 1;
+    if (mesProx > 11) { mesProx = 0; anoProx += 1; }
+  }
+  const ultimoDiaDoMes = new Date(anoProx, mesProx + 1, 0).getDate();
+  const diaFinal = Math.min(diaCiclo, ultimoDiaDoMes);
+  const dataRenovacao = new Date(anoProx, mesProx, diaFinal);
+  dataRenovacao.setHours(0, 0, 0, 0);
+  return Math.round((dataRenovacao - hoje) / 86400000);
+}
+
 function verificarResetMensal() {
   const cicloSalvo = localStorage.getItem('uso_mensal_mes');
   const cicloAtual = obterIdentificadorCicloAtual();
@@ -1714,12 +1736,36 @@ function atualizarResumoUsoMensal() {
     if (pctEl) pctEl.textContent = '';
   }
 
-  // Info do ciclo de renovacao
+  // Info do ciclo de renovacao (cantinho: mostra só a data da próxima renovação,
+  // já que os dias/dia do ciclo agora aparecem na linha destacada embaixo)
   const cicloTagEl = document.getElementById('plano-ciclo-tag');
   if (cicloTagEl) {
     const diaCiclo = obterDiaCiclo();
     const proximaRenovacao = calcularProximaRenovacao(diaCiclo);
-    cicloTagEl.innerHTML = `🔄 Renova dia ${diaCiclo}<br>${proximaRenovacao}`;
+    cicloTagEl.innerHTML = `📅 ${proximaRenovacao}`;
+  }
+
+  // Linha destacada de renovação: "Renova dia X · faltam Y dias", mudando de cor
+  // conforme se aproxima (amarelo com 3 dias ou menos, vermelho se já passou do dia).
+  const renovEl = document.getElementById('plano-renovacao');
+  if (renovEl) {
+    const diaCiclo = obterDiaCiclo();
+    const dias = calcularDiasAteRenovacao(diaCiclo);
+    let texto, classe = '';
+    if (dias <= 0) {
+      texto = `🔄 Renova dia ${diaCiclo} · renova hoje`;
+      classe = 'perto';
+    } else if (dias === 1) {
+      texto = `🔄 Renova dia ${diaCiclo} · falta 1 dia`;
+      classe = 'perto';
+    } else if (dias <= 3) {
+      texto = `🔄 Renova dia ${diaCiclo} · faltam ${dias} dias`;
+      classe = 'perto';
+    } else {
+      texto = `🔄 Renova dia ${diaCiclo} · faltam ${dias} dias`;
+    }
+    renovEl.textContent = texto;
+    renovEl.className = 'plano-renovacao' + (classe ? ' ' + classe : '');
   }
 }
 
