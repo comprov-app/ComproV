@@ -1824,13 +1824,20 @@ async function startProcessing() {
       errosConsecutivosDeApi = 0;
     } catch(e) {
       updateItem(i, (dadosParciais && dadosParciais.nome) || selectedFiles[i].name, e.message, 'Erro', 'badge-err');
+      const falhouPorConexao = ehFalhaDeConexao(e.message);
       dadosLidos.push({
         ...(dadosParciais || {}),
         nome: (dadosParciais && dadosParciais.nome) || selectedFiles[i].name,
         file: selectedFiles[i],
         sucesso: false,
         previewUrl: items[i].previewUrl,
-        erro: e.message
+        erro: e.message,
+        // Marca para a 2ª rodada: só falhas de conexão são reenviadas no final.
+        // Guarda o índice e os dados já lidos para não precisar ler a etiqueta de novo.
+        falhaConexao: falhouPorConexao,
+        indiceItem: i,
+        hashArquivo: hashArquivo,
+        dadosEnvio: dadosParciais
       });
       // ERR-03 e ERR-04 indicam problemas de autenticação/configuração da API de envio
       // ERR-01 e ERR-02 são erros de leitura da etiqueta, não de configuração
@@ -1871,6 +1878,55 @@ async function startProcessing() {
     // só aplica se ainda houver próximo item na fila
     if (i < selectedFiles.length - 1 && intervaloEnvios > 0) {
       await contagemRegressiva(intervaloEnvios);
+    }
+  }
+
+  // ===== SEGUNDA RODADA: reenvia os que falharam por CONEXÃO =====
+  // Durante o lote, uma falha de conexão não trava os próximos — só é marcada.
+  // Aqui no final, quando a rede provavelmente já se recuperou, tentamos cada um
+  // desses de novo, até 2 vezes. Isso recupera as oscilacoes de wi-fi de feira
+  // sem atrasar o lote principal. Só reenvia falha de CONEXÃO (número inválido,
+  // etiqueta ilegível e duplicada continuam como erro, não sao retentados).
+  const paraReenviar = dadosLidos.filter(d => d && d.falhaConexao && !d.sucesso);
+  // Só faz a segunda rodada se o circuit breaker NÃO tiver disparado (se disparou, é
+  // porque houve muitas falhas de chave/config seguidas, e reenviar não vai adiantar).
+  const circuitBreakerDisparou = errosConsecutivosDeApi >= LIMITE_ERROS_CONSECUTIVOS;
+  if (paraReenviar.length > 0 && !circuitBreakerDisparou) {
+    const progText = document.getElementById('prog-text');
+    if (progText) progText.textContent = `Tentando reenviar ${paraReenviar.length} que falharam...`;
+    await sleep(2000); // Respiro antes de começar a segunda rodada
+
+    for (const item of paraReenviar) {
+      const idx = item.indiceItem;
+      let recuperou = false;
+      // Tenta até 2 vezes cada um
+      for (let tentativa = 1; tentativa <= 2 && !recuperou; tentativa++) {
+        try {
+          updateItem(idx, item.nome, `Reenviando (tentativa ${tentativa})...`, 'Enviando', 'badge-proc');
+          if (!item.dadosEnvio || !item.dadosEnvio.telefone) {
+            throw new Error('Número de telefone não encontrado na etiqueta.');
+          }
+          await enviarFoto(item.file, item.dadosEnvio, evoServer, evoInstance, evoApiKey);
+          // Deu certo! Atualiza status e contadores
+          updateItem(idx, item.dadosEnvio.nome, `${item.dadosEnvio.telefone} · ✓ Enviado`, 'Enviado', 'badge-ok');
+          item.sucesso = true;
+          item.erro = null;
+          item.falhaConexao = false;
+          incrementarUsoMensal(1);
+          if (item.hashArquivo) registrarHashEnviado(item.hashArquivo);
+          ok++;
+          err--;
+          recuperou = true;
+        } catch (e2) {
+          if (!ehFalhaDeConexao(e2.message) || tentativa === 2) {
+            // Não é mais falha de conexão, ou esgotou as 2 tentativas: fica como erro
+            updateItem(idx, item.nome, e2.message, 'Erro', 'badge-err');
+            item.erro = e2.message;
+          } else {
+            await sleep(4000); // Espera antes da 2ª tentativa deste item
+          }
+        }
+      }
     }
   }
 
@@ -1985,9 +2041,19 @@ async function enviarFoto(file, dados, serverUrl, instanceName, apiKey) {
     })
   }, 30000, 'Tempo de envio esgotado. Verifique sua conexão e tente novamente.');
   if (!resp.ok) {
-    const txt = await resp.text();
     throw new Error('Falha ao enviar a foto. Verifique sua conexão e tente novamente.');
   }
+}
+
+// Verifica se um erro foi de CONEXÃO/TIMEOUT (rede oscilou) — esses valem retentar na
+// segunda rodada. Erros de número inválido, leitura ou rejeição do servidor não entram aqui.
+function ehFalhaDeConexao(mensagem) {
+  const msg = (mensagem || '').toLowerCase();
+  return msg.includes('tempo de envio esgotado') ||
+         msg.includes('tempo de espera esgotado') ||
+         msg.includes('falha de conexão') || msg.includes('falha de conexao') ||
+         msg.includes('verifique sua conexão') || msg.includes('verifique sua conexao') ||
+         msg.includes('verifique sua internet');
 }
 
 async function enviarMensagem(dados, serverUrl, instanceName, apiKey) {
