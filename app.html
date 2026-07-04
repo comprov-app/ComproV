@@ -1745,8 +1745,9 @@ function atualizarResumoUsoMensal() {
     cicloTagEl.innerHTML = `📅 ${proximaRenovacao}`;
   }
 
-  // Linha destacada de renovação: "Renova dia X · faltam Y dias", mudando de cor
-  // conforme se aproxima (amarelo com 3 dias ou menos, vermelho se já passou do dia).
+  // Linha de renovação: normalmente mostra só "Renova dia X". Quando falta pouco
+  // (3 dias ou menos), acrescenta o aviso de quantos dias faltam e fica amarelo,
+  // para o cliente lembrar de pagar sem poluir a tela o resto do mês.
   const renovEl = document.getElementById('plano-renovacao');
   if (renovEl) {
     const diaCiclo = obterDiaCiclo();
@@ -1762,7 +1763,8 @@ function atualizarResumoUsoMensal() {
       texto = `🔄 Renova dia ${diaCiclo} · faltam ${dias} dias`;
       classe = 'perto';
     } else {
-      texto = `🔄 Renova dia ${diaCiclo} · faltam ${dias} dias`;
+      // Longe da renovação: mostra só o dia, sem contagem de dias
+      texto = `🔄 Renova dia ${diaCiclo}`;
     }
     renovEl.textContent = texto;
     renovEl.className = 'plano-renovacao' + (classe ? ' ' + classe : '');
