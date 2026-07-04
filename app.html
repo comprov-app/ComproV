@@ -130,6 +130,26 @@
   .plano-renovacao.perto { background: #fff6e0; color: #b8860b; }
   .plano-renovacao.vencido { background: #fdecea; color: #c0392b; }
 
+  /* Calendário do histórico */
+  .cal-topo { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .cal-titulo { font-size:16px; font-weight:700; color:var(--text-primary); text-transform:capitalize; }
+  .cal-nav { width:38px; height:38px; border-radius:10px; border:1px solid var(--row-border); background:var(--card-bg,#fff); color:var(--text-primary); font-size:20px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .cal-nav:active { background:var(--tab-bg,#f0f0ec); }
+  .cal-grade { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .cal-dow { text-align:center; font-size:11px; font-weight:700; color:var(--text-tertiary); padding:4px 0; }
+  .cal-cel { aspect-ratio:1; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; background:var(--tab-bg,#f4f4f0); }
+  .cal-vazio { background:transparent; }
+  .cal-dia { font-size:13px; color:var(--text-secondary); font-weight:600; }
+  .cal-ativo { background:#000; cursor:pointer; }
+  .cal-ativo .cal-dia { color:#fff; }
+  .cal-num { font-size:10px; font-weight:700; color:#fff; background:rgba(255,255,255,.22); border-radius:6px; padding:0 5px; margin-top:2px; }
+  .cal-hoje { box-shadow:0 0 0 2px var(--text-primary) inset; }
+  .cal-hoje:not(.cal-ativo) .cal-dia { color:var(--text-primary); font-weight:800; }
+  .cal-legenda { font-size:11px; color:var(--text-tertiary); text-align:center; margin-top:12px; }
+  [data-theme="dark"] .cal-ativo { background:#e8e8e8; }
+  [data-theme="dark"] .cal-ativo .cal-dia { color:#111; }
+  [data-theme="dark"] .cal-num { color:#111; background:rgba(0,0,0,.15); }
+
   /* Seções repaginadas (aba mensagem) */
   .sec-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; padding: 18px; margin-bottom: 12px; }
   .sec-head { display: flex; align-items: center; gap: 8px; }
@@ -2264,60 +2284,119 @@ function salvarHistorico(inicioLote, ok, err) {
   localStorage.setItem('historico_lotes', JSON.stringify(historico));
 }
 
-function formatarDataHistorico(isoStr) {
-  const d = new Date(isoStr);
-  const dataStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const horaStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  return `${dataStr} às ${horaStr}`;
-}
+// Mês atualmente exibido no calendário do histórico (começa no mês de hoje)
+let mesCalendarioHistorico = null;
 
 function abrirHistorico() {
-  const historico = JSON.parse(localStorage.getItem('historico_lotes') || '[]');
-  const container = document.getElementById('historico-lista');
-
-  if (historico.length === 0) {
-    container.innerHTML = `<div class="alert alert-info">Nenhum lote enviado ainda.</div>`;
-  } else {
-    container.innerHTML = historico.map((lote, idx) => {
-      const valorTaxas = lote.itens
-        .filter(it => it.taxa)
-        .reduce((soma, it) => soma + (parseFloat(it.taxa) || 0), 0);
-
-      return `
-      <div class="card" style="margin-bottom:10px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleLoteHistorico(${idx})">
-          <div>
-            <div style="font-size:13px; font-weight:600; color:var(--text-primary);">${formatarDataHistorico(lote.data)}</div>
-            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
-              ${lote.total} etiquetas · ${lote.enviados} enviadas${lote.erros > 0 ? ` · ${lote.erros} erro(s)` : ''}${valorTaxas > 0 ? ` · R$ ${valorTaxas.toFixed(2)} em taxas` : ''}
-            </div>
-          </div>
-          <span style="font-size:18px; color:var(--text-secondary);" id="lote-arrow-${idx}">▾</span>
-        </div>
-        <div id="lote-detalhe-${idx}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--row-border);">
-          ${lote.itens.map(it => `
-            <div class="item-row" style="padding:6px 0;">
-              <div class="item-info">
-                <div class="name" style="font-size:12px;">${escHtml(it.nome)}</div>
-                <div class="detail">${escHtml(it.telefone || '')}${it.taxa ? ` · R$ ${parseFloat(it.taxa).toFixed(2)}` : ''}</div>
-              </div>
-              <span class="badge ${it.sucesso ? 'badge-ok' : 'badge-err'}" style="font-size:10px;">${it.sucesso ? 'Enviado' : 'Erro'}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>`;
-    }).join('');
+  if (!mesCalendarioHistorico) {
+    const hoje = new Date();
+    mesCalendarioHistorico = { ano: hoje.getFullYear(), mes: hoje.getMonth() };
   }
-
+  renderCalendarioHistorico();
   setSection('sec-historico');
 }
 
-function toggleLoteHistorico(idx) {
-  const det = document.getElementById('lote-detalhe-' + idx);
-  const arrow = document.getElementById('lote-arrow-' + idx);
-  const aberto = det.style.display !== 'none';
-  det.style.display = aberto ? 'none' : 'block';
-  arrow.textContent = aberto ? '▾' : '▴';
+// Agrupa os lotes por dia (chave 'aaaa-mm-dd') e soma os envios de cada dia.
+function agruparHistoricoPorDia() {
+  const historico = JSON.parse(localStorage.getItem('historico_lotes') || '[]');
+  const porDia = {};
+  historico.forEach(lote => {
+    const d = new Date(lote.data);
+    const chave = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (!porDia[chave]) porDia[chave] = { enviados: 0, erros: 0, total: 0, lotes: [] };
+    porDia[chave].enviados += lote.enviados || 0;
+    porDia[chave].erros += lote.erros || 0;
+    porDia[chave].total += lote.total || 0;
+    porDia[chave].lotes.push(lote);
+  });
+  return porDia;
+}
+
+function mudarMesHistorico(delta) {
+  mesCalendarioHistorico.mes += delta;
+  if (mesCalendarioHistorico.mes > 11) { mesCalendarioHistorico.mes = 0; mesCalendarioHistorico.ano++; }
+  if (mesCalendarioHistorico.mes < 0) { mesCalendarioHistorico.mes = 11; mesCalendarioHistorico.ano--; }
+  renderCalendarioHistorico();
+}
+
+function renderCalendarioHistorico() {
+  const container = document.getElementById('historico-lista');
+  const porDia = agruparHistoricoPorDia();
+  const { ano, mes } = mesCalendarioHistorico;
+
+  const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const nomesDiaSemana = ['D','S','T','Q','Q','S','S'];
+
+  const primeiroDia = new Date(ano, mes, 1).getDay(); // 0=domingo
+  const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+  const hoje = new Date();
+  const ehHoje = (dia) => hoje.getFullYear()===ano && hoje.getMonth()===mes && hoje.getDate()===dia;
+
+  // Cabeçalho dos dias da semana
+  let celulas = nomesDiaSemana.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  // Espaços vazios antes do dia 1
+  for (let i = 0; i < primeiroDia; i++) celulas += `<div class="cal-cel cal-vazio"></div>`;
+
+  // Dias do mês
+  for (let dia = 1; dia <= diasNoMes; dia++) {
+    const chave = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+    const dados = porDia[chave];
+    const temEnvio = dados && dados.enviados > 0;
+    const classe = 'cal-cel' + (temEnvio ? ' cal-ativo' : '') + (ehHoje(dia) ? ' cal-hoje' : '');
+    const onclick = temEnvio ? `onclick="mostrarDiaHistorico('${chave}')"` : '';
+    const badge = temEnvio ? `<span class="cal-num">${dados.enviados}</span>` : '';
+    celulas += `<div class="${classe}" ${onclick}><span class="cal-dia">${dia}</span>${badge}</div>`;
+  }
+
+  container.innerHTML = `
+    <div class="cal-topo">
+      <button class="cal-nav" onclick="mudarMesHistorico(-1)">‹</button>
+      <div class="cal-titulo">${nomesMes[mes]} ${ano}</div>
+      <button class="cal-nav" onclick="mudarMesHistorico(1)">›</button>
+    </div>
+    <div class="cal-grade">${celulas}</div>
+    <div class="cal-legenda">Toque num dia destacado para ver os envios.</div>
+    <div id="cal-detalhe-dia"></div>
+  `;
+}
+
+// Mostra os detalhes de um dia específico (quantos envios, quais lojas) abaixo do calendário.
+function mostrarDiaHistorico(chave) {
+  const porDia = agruparHistoricoPorDia();
+  const dados = porDia[chave];
+  const det = document.getElementById('cal-detalhe-dia');
+  if (!dados || !det) return;
+
+  const [ano, mes, dia] = chave.split('-');
+  const dataFmt = `${dia}/${mes}/${ano}`;
+
+  // Junta todos os itens de todos os lotes daquele dia
+  const todosItens = [];
+  dados.lotes.forEach(lote => (lote.itens || []).forEach(it => todosItens.push(it)));
+
+  const valorTaxas = todosItens
+    .filter(it => it.taxa)
+    .reduce((soma, it) => soma + (parseFloat(it.taxa) || 0), 0);
+
+  det.innerHTML = `
+    <div class="card" style="margin-top:14px;">
+      <div class="card-title" style="font-size:14px; margin-bottom:4px;">📅 ${dataFmt}</div>
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">
+        <b style="color:var(--text-primary)">${dados.enviados}</b> envios${dados.erros > 0 ? ` · ${dados.erros} erro(s)` : ''}${dados.lotes.length > 1 ? ` · ${dados.lotes.length} lotes` : ''}${valorTaxas > 0 ? ` · R$ ${valorTaxas.toFixed(2)} em taxas` : ''}
+      </div>
+      ${todosItens.map(it => `
+        <div class="item-row" style="padding:6px 0;">
+          <div class="item-info">
+            <div class="name" style="font-size:12px;">${escHtml(it.nome || '?')}</div>
+            <div class="detail">${escHtml(it.telefone || '')}${it.taxa ? ` · R$ ${parseFloat(it.taxa).toFixed(2)}` : ''}</div>
+          </div>
+          <span class="badge ${it.sucesso ? 'badge-ok' : 'badge-err'}" style="font-size:10px;">${it.sucesso ? 'Enviado' : 'Erro'}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  det.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function limparHistorico() {
