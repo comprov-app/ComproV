@@ -146,6 +146,8 @@
   .cal-hoje { box-shadow:0 0 0 2px var(--text-primary) inset; }
   .cal-hoje:not(.cal-ativo) .cal-dia { color:var(--text-primary); font-weight:800; }
   .cal-legenda { font-size:11px; color:var(--text-tertiary); text-align:center; margin-top:12px; }
+  .cal-total { margin-top:16px; padding:12px 14px; border-radius:12px; background:var(--tab-bg,#f0f0ec); color:var(--text-secondary); font-size:14px; font-weight:600; text-align:center; }
+  .cal-total b { color:var(--text-primary); font-size:16px; }
   [data-theme="dark"] .cal-ativo { background:#e8e8e8; }
   [data-theme="dark"] .cal-ativo .cal-dia { color:#111; }
   [data-theme="dark"] .cal-num { color:#111; background:rgba(0,0,0,.15); }
@@ -2339,10 +2341,12 @@ function renderCalendarioHistorico() {
   for (let i = 0; i < primeiroDia; i++) celulas += `<div class="cal-cel cal-vazio"></div>`;
 
   // Dias do mês
+  let totalMes = 0;
   for (let dia = 1; dia <= diasNoMes; dia++) {
     const chave = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
     const dados = porDia[chave];
     const temEnvio = dados && dados.enviados > 0;
+    if (temEnvio) totalMes += dados.enviados;
     const classe = 'cal-cel' + (temEnvio ? ' cal-ativo' : '') + (ehHoje(dia) ? ' cal-hoje' : '');
     const onclick = temEnvio ? `onclick="mostrarDiaHistorico('${chave}')"` : '';
     const badge = temEnvio ? `<span class="cal-num">${dados.enviados}</span>` : '';
@@ -2356,6 +2360,7 @@ function renderCalendarioHistorico() {
       <button class="cal-nav" onclick="mudarMesHistorico(1)">›</button>
     </div>
     <div class="cal-grade">${celulas}</div>
+    <div class="cal-total">📨 Total do mês: <b>${totalMes}</b> ${totalMes === 1 ? 'envio' : 'envios'}</div>
     <div class="cal-legenda">Toque num dia destacado para ver os envios.</div>
     <div id="cal-detalhe-dia"></div>
   `;
