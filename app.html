@@ -706,6 +706,9 @@ async function sincronizarConfig() {
     // Se o admin pediu um reset do contador desde a última sincronização, aplica agora
     if (cfg.plano) localStorage.setItem('plano_nome', cfg.plano);
     processarResetRemoto(cfg);
+    // Puxa o uso real do servidor (contador central) e atualiza o espelho local.
+    // Assim, se o cliente usou em outro aparelho, este já reflete o número verdadeiro.
+    await sincronizarUsoDoServidor();
     atualizarResumoUsoMensal();
     return { ok: true, motivo: 'atualizado' };
   } catch (e) {
@@ -1530,6 +1533,62 @@ function incrementarUsoMensal(qtd) {
   localStorage.setItem('uso_mensal_contador', String(atual + qtd));
 }
 
+// ===== SINCRONIZAÇÃO DO CONTADOR COM O SERVIDOR (contador central) =====
+// O contador "de verdade" fica no servidor. O localStorage é só um espelho rápido
+// pra mostrar na tela sem esperar a rede. Isso fecha a brecha de usar vários
+// aparelhos: todos avisam o mesmo servidor, que recusa quando o limite estoura.
+
+// Puxa o uso real do servidor e atualiza o espelho local. Chamado ao abrir/logar.
+async function sincronizarUsoDoServidor() {
+  const codigo = localStorage.getItem('codigo_acesso');
+  if (!codigo) return;
+  try {
+    const resp = await fetch(`${COMPROV_BACKEND}/uso/${encodeURIComponent(codigo)}`);
+    if (!resp.ok) return; // se falhar, mantém o valor local (não trava o app)
+    const dados = await resp.json();
+    if (dados && typeof dados.uso_atual === 'number') {
+      // O servidor é a verdade: atualiza o espelho local com o número real
+      localStorage.setItem('uso_mensal_contador', String(dados.uso_atual));
+    }
+  } catch (e) {
+    // Sem internet ou servidor fora: mantém o valor local, não quebra nada
+  }
+}
+
+// Avisa o servidor que houve mais 1 envio. Retorna o resultado do servidor.
+// Se o servidor recusar (limite atingido), retorna { ok:false, limiteAtingido:true }.
+// Se não conseguir falar com o servidor, conta local mesmo assim (não perde o envio).
+async function incrementarUsoNoServidor() {
+  const codigo = localStorage.getItem('codigo_acesso');
+  if (!codigo) { incrementarUsoMensal(1); return { ok: true, local: true }; }
+  try {
+    const resp = await fetch(`${COMPROV_BACKEND}/uso/${encodeURIComponent(codigo)}/incrementar`, {
+      method: 'POST'
+    });
+    const dados = await resp.json().catch(() => null);
+    if (resp.status === 409) {
+      // Servidor recusou: limite do plano atingido
+      if (dados && typeof dados.uso_atual === 'number') {
+        localStorage.setItem('uso_mensal_contador', String(dados.uso_atual));
+      }
+      return { ok: false, limiteAtingido: true };
+    }
+    if (resp.ok && dados && typeof dados.uso_atual === 'number') {
+      // Servidor aceitou: usa o número dele como oficial no espelho local
+      localStorage.setItem('uso_mensal_contador', String(dados.uso_atual));
+      return { ok: true };
+    }
+    // Resposta inesperada: conta local pra não perder o envio
+    incrementarUsoMensal(1);
+    return { ok: true, local: true };
+  } catch (e) {
+    // Sem conexão com o servidor: conta local pra não travar o envio.
+    // Na próxima sincronização, o servidor se ajusta.
+    incrementarUsoMensal(1);
+    return { ok: true, local: true };
+  }
+}
+
 // ===== DETECÇÃO DE FOTO DUPLICADA: evita reenviar a mesma etiqueta em lotes diferentes =====
 // Usa um hash do conteúdo do arquivo (não o nome) para identificar com certeza se é a mesma imagem,
 // mesmo que tenha sido renomeada ou vinda de uma seleção diferente.
@@ -1924,7 +1983,7 @@ async function startProcessing() {
       await enviarFoto(selectedFiles[i], dados, evoServer, evoInstance, evoApiKey);
       updateItem(i, dados.nome, `${dados.telefone} · ✓ Enviado`, 'Enviado', 'badge-ok');
       dadosLidos.push({ ...dados, file: selectedFiles[i], previewUrl: items[i].previewUrl, sucesso: true });
-      incrementarUsoMensal(1);
+      await incrementarUsoNoServidor();
       registrarHashEnviado(hashArquivo);
       limparErroDeApi();
       ok++;
@@ -2019,7 +2078,7 @@ async function startProcessing() {
           item.sucesso = true;
           item.erro = null;
           item.falhaConexao = false;
-          incrementarUsoMensal(1);
+          await incrementarUsoNoServidor();
           if (item.hashArquivo) registrarHashEnviado(item.hashArquivo);
           ok++;
           err--;
