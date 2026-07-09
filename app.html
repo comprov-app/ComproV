@@ -556,16 +556,12 @@ let dadosLidos = [];
 
 // ===== CONFIG =====
 function saveConfig() {
-  // As chaves vêm da ativação por código (campos ocultos). Só sobrescreve se houver
-  // valor — assim salvar Mensagem/PIX/Aparência nunca apaga a configuração ativada.
-  const akey = document.getElementById('anthropic-key').value.trim();
+  // As chaves ficam no servidor. Aqui só salvamos os dados não-secretos da
+  // Evolution (servidor e instância) e as preferências de Mensagem/PIX/Aparência.
   const asrv = document.getElementById('evo-server').value.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
   const ainst = document.getElementById('evo-instance').value.trim();
-  const atok = document.getElementById('evo-apikey').value.trim();
-  if (akey)  localStorage.setItem('anthropic_key', akey);
   if (asrv)  localStorage.setItem('evo_server', asrv);
   if (ainst) localStorage.setItem('evo_instance', ainst);
-  if (atok)  localStorage.setItem('evo_apikey', atok);
   const intervaloTexto = document.getElementById('intervalo-envio').value.trim().toLowerCase();
   if (intervaloTexto === '' || intervaloTexto === 'auto') {
     localStorage.setItem('intervalo_envio', 'auto');
@@ -622,12 +618,11 @@ async function ativarPorCodigo() {
 
     const cfg = await resp.json();
 
-    // Salva as 4 informações nos mesmos lugares que o app já usa
+    // Salva os dados nao-secretos que o app usa. As chaves (anthropic/evolution)
+    // NAO vem mais do servidor — ficam so no backend, usadas em /ler e /enviar.
     const servidor = (cfg.evolution_url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
-    localStorage.setItem('anthropic_key', cfg.anthropic_key || '');
     localStorage.setItem('evo_server',    servidor);
     localStorage.setItem('evo_instance',  cfg.instancia || '');
-    localStorage.setItem('evo_apikey',    cfg.instancia_token || '');
     localStorage.setItem('codigo_acesso', codigo);
 
     // Limite mensal vem do plano definido no painel (backend). O cliente não edita.
@@ -643,11 +638,9 @@ async function ativarPorCodigo() {
     if (cfg.plano) localStorage.setItem('plano_nome', cfg.plano);
     processarResetRemoto(cfg);
 
-    // Atualiza os campos ocultos também
-    document.getElementById('anthropic-key').value = cfg.anthropic_key || '';
+    // Atualiza os campos ocultos não-secretos
     document.getElementById('evo-server').value    = servidor;
     document.getElementById('evo-instance').value  = cfg.instancia || '';
-    document.getElementById('evo-apikey').value    = cfg.instancia_token || '';
 
     limparErroDeApi();
     atualizarVisibilidadeAbaApis();
@@ -692,10 +685,8 @@ async function sincronizarConfig() {
   try {
     const cfg = await resp.json();
     const servidor = (cfg.evolution_url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
-    localStorage.setItem('anthropic_key', cfg.anthropic_key || '');
     localStorage.setItem('evo_server',    servidor);
     localStorage.setItem('evo_instance',  cfg.instancia || '');
-    localStorage.setItem('evo_apikey',    cfg.instancia_token || '');
     if (cfg.limite_envios !== undefined && cfg.limite_envios !== null) {
       localStorage.setItem('limite_mensal', String(cfg.limite_envios));
     }
@@ -717,10 +708,8 @@ async function sincronizarConfig() {
 }
 
 function loadConfig() {
-  document.getElementById('anthropic-key').value = localStorage.getItem('anthropic_key') || '';
   document.getElementById('evo-server').value    = localStorage.getItem('evo_server') || '';
   document.getElementById('evo-instance').value  = localStorage.getItem('evo_instance') || '';
-  document.getElementById('evo-apikey').value    = localStorage.getItem('evo_apikey') || '';
   document.getElementById('codigo-acesso').value = localStorage.getItem('codigo_acesso') || '';
   const intervaloSalvo = localStorage.getItem('intervalo_envio') || 'auto';
   document.getElementById('intervalo-envio').value = intervaloSalvo;
@@ -740,12 +729,13 @@ function loadConfig() {
 }
 
 // ===== OCULTAR ABA APIS: esconde quando configurado e funcionando, reaparece se der erro =====
+// Agora que as chaves ficam no servidor, o que define "configurado" é ter um
+// codigo de acesso valido ativado (e os dados nao-secretos da Evolution).
 function todasChavesPreenchidas() {
   return !!(
-    localStorage.getItem('anthropic_key') &&
+    localStorage.getItem('codigo_acesso') &&
     localStorage.getItem('evo_server') &&
-    localStorage.getItem('evo_instance') &&
-    localStorage.getItem('evo_apikey')
+    localStorage.getItem('evo_instance')
   );
 }
 
@@ -1853,13 +1843,12 @@ function atualizarResumoUsoMensal() {
 }
 
 async function startProcessing() {
-  let anthropicKey = localStorage.getItem('anthropic_key');
+  const codigoAcesso = localStorage.getItem('codigo_acesso');
   let evoServer     = localStorage.getItem('evo_server');
   let evoInstance   = localStorage.getItem('evo_instance');
-  let evoApiKey     = localStorage.getItem('evo_apikey');
 
-  if (!anthropicKey || !evoServer || !evoInstance || !evoApiKey) {
-    mostrarAvisoCustomizado('Configure todas as chaves no Painel antes de enviar.', '⚠️');
+  if (!codigoAcesso || !evoServer || !evoInstance) {
+    mostrarAvisoCustomizado('Ative sua loja no Painel antes de enviar.', '⚠️');
     return;
   }
 
@@ -1877,11 +1866,9 @@ async function startProcessing() {
     return;
   }
 
-  // Recarrega as chaves caso a sincronizacao tenha atualizado alguma
-  anthropicKey = localStorage.getItem('anthropic_key');
+  // Recarrega os dados nao-secretos caso a sincronizacao tenha atualizado
   evoServer    = localStorage.getItem('evo_server');
   evoInstance  = localStorage.getItem('evo_instance');
-  evoApiKey    = localStorage.getItem('evo_apikey');
 
   // O limite vem do plano definido no painel (backend), salvo ao ativar pelo código.
   // Se não houver limite, a loja não foi ativada corretamente — manda ativar de novo.
@@ -1968,7 +1955,7 @@ async function startProcessing() {
     updateItem(i, selectedFiles[i].name, 'Lendo a imagem...', 'Lendo', 'badge-proc');
     let dadosParciais = null;
     try {
-      const dados = await lerEtiqueta(selectedFiles[i], anthropicKey);
+      const dados = await lerEtiqueta(selectedFiles[i]);
 
       // Se "cobrar taxa de todos" estiver ativo, força a taxa em todo o lote,
       // ignorando o $ / $$ lido da etiqueta
@@ -1980,7 +1967,7 @@ async function startProcessing() {
       dadosParciais = dados;
       if (!dados || !dados.telefone) throw new Error('Número de telefone não encontrado na etiqueta.');
       updateItem(i, dados.nome || selectedFiles[i].name, `${dados.telefone} · Enviando...`, 'Enviando', 'badge-proc');
-      await enviarFoto(selectedFiles[i], dados, evoServer, evoInstance, evoApiKey);
+      await enviarFoto(selectedFiles[i], dados, evoServer, evoInstance);
       updateItem(i, dados.nome, `${dados.telefone} · ✓ Enviado`, 'Enviado', 'badge-ok');
       dadosLidos.push({ ...dados, file: selectedFiles[i], previewUrl: items[i].previewUrl, sucesso: true });
       // O contador já foi incrementado pelo servidor dentro de enviarFoto (/enviar)
@@ -2072,7 +2059,7 @@ async function startProcessing() {
           if (!item.dadosEnvio || !item.dadosEnvio.telefone) {
             throw new Error('Número de telefone não encontrado na etiqueta.');
           }
-          await enviarFoto(item.file, item.dadosEnvio, evoServer, evoInstance, evoApiKey);
+          await enviarFoto(item.file, item.dadosEnvio, evoServer, evoInstance);
           // Deu certo! Atualiza status e contadores
           updateItem(idx, item.dadosEnvio.nome, `${item.dadosEnvio.telefone} · ✓ Enviado`, 'Enviado', 'badge-ok');
           item.sucesso = true;
