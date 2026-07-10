@@ -1250,7 +1250,7 @@ function updateProgress(done, total) {
 
 function renderItems(items) {
   document.getElementById('items-list').innerHTML = items.map((it, i) => `
-    <div class="item-row">
+    <div class="item-row" id="item-row-${i}">
       <img class="item-thumb" id="item-thumb-${i}" src="" loading="lazy" />
       <div class="item-info">
         <div class="name" id="iname-${i}">${escHtml(it.file.name)}</div>
@@ -1297,6 +1297,38 @@ function gerarMiniaturaFila(file, index) {
   });
 }
 
+// ===== AUTO-SCROLL INTELIGENTE DURANTE O ENVIO =====
+// Enquanto envia, a tela acompanha o item atual sozinha. Se o usuário rolar
+// pra cima pra ver algo, o acompanhamento PARA (deixa ele livre). Quando ele
+// rolar de volta pro fim, o acompanhamento VOLTA a funcionar automaticamente.
+let autoScrollLigado = true;      // começa acompanhando
+let processandoEnvios = false;    // true enquanto o lote está sendo enviado
+
+// Detecta se o usuário está perto do fim da página (tolerância de 150px).
+function estaPertoDoFim() {
+  const scrollBottom = window.innerHeight + window.scrollY;
+  const alturaTotal = document.documentElement.scrollHeight;
+  return (alturaTotal - scrollBottom) < 150;
+}
+
+// Quando o usuário rola a tela na mão, decide se acompanha ou não:
+// - Rolou pra cima (saiu do fim) -> desliga o acompanhamento
+// - Voltou pro fim -> religa o acompanhamento
+function aoRolarTela() {
+  if (!processandoEnvios) return;
+  autoScrollLigado = estaPertoDoFim();
+}
+
+// Rola suavemente até o item que está sendo enviado, só se o acompanhamento
+// estiver ligado (ou seja, se o usuário não estiver mexendo pra ver outra coisa).
+function acompanharItem(i) {
+  if (!autoScrollLigado) return;
+  const linha = document.getElementById('item-row-' + i);
+  if (linha) linha.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+window.addEventListener('scroll', aoRolarTela, { passive: true });
+
 function updateItem(i, nome, detail, badge, badgeClass) {
   const n = document.getElementById('iname-'+i);
   const d = document.getElementById('idetail-'+i);
@@ -1304,6 +1336,8 @@ function updateItem(i, nome, detail, badge, badgeClass) {
   if(n) n.textContent = nome;
   if(d) d.textContent = detail;
   if(b) { b.textContent = badge; b.className = 'badge ' + badgeClass; }
+  // Acompanha este item na tela (se o acompanhamento estiver ligado)
+  acompanharItem(i);
 }
 
 // ===== WAKE LOCK: mantém o app ativo enquanto a tela estiver aberta =====
@@ -1900,6 +1934,9 @@ async function startProcessing() {
 
   loteEmAndamento = true;
   await pedirWakeLock();
+  // Liga o acompanhamento automático da tela durante o envio
+  processandoEnvios = true;
+  autoScrollLigado = true;
 
   let ok = 0, err = 0;
   // Conta falhas de CONEXAO/API seguidas (nao erros de leitura de etiqueta individual).
@@ -2083,6 +2120,8 @@ async function startProcessing() {
 
   loteEmAndamento = false;
   liberarWakeLock();
+  // Desliga o acompanhamento automático (o envio terminou)
+  processandoEnvios = false;
   limparProgressoLote();
 
   await sleep(400);
