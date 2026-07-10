@@ -1270,14 +1270,13 @@ async function gerarMiniaturasDaFila(items) {
   const TAMANHO_LOTE = 4;
   for (let i = 0; i < items.length; i += TAMANHO_LOTE) {
     const lote = items.slice(i, i + TAMANHO_LOTE);
-    await Promise.all(lote.map((it, idx) => gerarMiniaturaFila(it.file, i + idx)));
+    await Promise.all(lote.map((it, idx) => gerarMiniaturaFila(it.file, i + idx, it)));
   }
 }
 
-function gerarMiniaturaFila(file, index) {
+function gerarMiniaturaFila(file, index, itemRef) {
   return new Promise((resolve) => {
     const imgEl = document.getElementById('item-thumb-' + index);
-    if (!imgEl) { resolve(); return; }
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
@@ -1288,7 +1287,11 @@ function gerarMiniaturaFila(file, index) {
       canvas.height = Math.round(img.height * escala);
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      imgEl.src = canvas.toDataURL('image/jpeg', 0.7);
+      const miniatura = canvas.toDataURL('image/jpeg', 0.7);
+      if (imgEl) imgEl.src = miniatura;
+      // Guarda a miniatura leve no item, pra reaproveitar na tela de resultado
+      // (evita usar a foto original pesada lá, que trava o celular).
+      if (itemRef) itemRef.thumbComprimida = miniatura;
       URL.revokeObjectURL(url); // Libera a foto original da memória imediatamente
       resolve();
     };
@@ -1967,7 +1970,7 @@ async function startProcessing() {
         nome: selectedFiles[i].name,
         file: selectedFiles[i],
         sucesso: false,
-        previewUrl: items[i].previewUrl,
+        previewUrl: items[i].previewUrl, thumbComprimida: items[i].thumbComprimida,
         erro: 'Limite de envios do mês atingido.'
       });
       err++;
@@ -1986,7 +1989,7 @@ async function startProcessing() {
         file: selectedFiles[i],
         sucesso: false,
         duplicado: true,
-        previewUrl: items[i].previewUrl,
+        previewUrl: items[i].previewUrl, thumbComprimida: items[i].thumbComprimida,
         erro: 'Esta foto já foi enviada anteriormente.'
       });
       err++;
@@ -2011,7 +2014,7 @@ async function startProcessing() {
       updateItem(i, dados.nome || selectedFiles[i].name, `${dados.telefone} · Enviando...`, 'Enviando', 'badge-proc');
       await enviarFoto(selectedFiles[i], dados, evoServer, evoInstance);
       updateItem(i, dados.nome, `${dados.telefone} · ✓ Enviado`, 'Enviado', 'badge-ok');
-      dadosLidos.push({ ...dados, file: selectedFiles[i], previewUrl: items[i].previewUrl, sucesso: true });
+      dadosLidos.push({ ...dados, file: selectedFiles[i], previewUrl: items[i].previewUrl, thumbComprimida: items[i].thumbComprimida, sucesso: true });
       // O contador já foi incrementado pelo servidor dentro de enviarFoto (/enviar)
       registrarHashEnviado(hashArquivo);
       limparErroDeApi();
@@ -2025,7 +2028,7 @@ async function startProcessing() {
         nome: (dadosParciais && dadosParciais.nome) || selectedFiles[i].name,
         file: selectedFiles[i],
         sucesso: false,
-        previewUrl: items[i].previewUrl,
+        previewUrl: items[i].previewUrl, thumbComprimida: items[i].thumbComprimida,
         erro: e.message,
         // Marca para a 2ª rodada: só falhas de conexão são reenviadas no final.
         // Guarda o índice e os dados já lidos para não precisar ler a etiqueta de novo.
@@ -2056,7 +2059,7 @@ async function startProcessing() {
             nome: selectedFiles[j].name,
             file: selectedFiles[j],
             sucesso: false,
-            previewUrl: items[j].previewUrl,
+            previewUrl: items[j].previewUrl, thumbComprimida: items[j].thumbComprimida,
             erro: 'Envio interrompido (falha de conexão).'
           });
           err++;
@@ -2304,21 +2307,47 @@ function showDone(ok, err) {
   document.getElementById('s-total').textContent = dadosLidos.length;
   document.getElementById('s-ok').textContent = ok;
   document.getElementById('s-err').textContent = err;
-  document.getElementById('done-list').innerHTML = dadosLidos.map((r, i) => `
+  const lista = document.getElementById('done-list');
+  lista.innerHTML = '';
+  setSection('sec-done');
+
+  // Monta o HTML de um item da lista de resultados.
+  function htmlItem(r, i) {
+    const status = r.sucesso
+      ? `<span class="badge badge-ok">Enviado</span>`
+      : (r.duplicado
+        ? `<span class="badge badge-wait">Já enviada</span>`
+        : `<button class="btn-share" onclick="compartilharFoto(${i})">📤 Enviar Manualmente</button>`);
+    return `
     <div class="item-row">
-      <img class="item-thumb" src="${r.previewUrl}" loading="lazy" onclick="abrirFotoResultado(${i})" style="cursor:pointer;" title="Toque para ampliar" />
+      <img class="item-thumb" src="${r.thumbComprimida || r.previewUrl}" loading="lazy" onclick="abrirFotoResultado(${i})" style="cursor:pointer;" title="Toque para ampliar" />
       <div class="item-info">
         <div class="name">${escHtml(r.nome||'?')}</div>
         <div class="detail">${escHtml(r.telefone||r.erro||'')}</div>
       </div>
-      ${r.sucesso
-        ? `<span class="badge badge-ok">Enviado</span>`
-        : (r.duplicado
-          ? `<span class="badge badge-wait">Já enviada</span>`
-          : `<button class="btn-share" onclick="compartilharFoto(${i})">📤 Enviar Manualmente</button>`)
-      }
-    </div>`).join('');
-  setSection('sec-done');
+      ${status}
+    </div>`;
+  }
+
+  // Renderiza a lista EM LOTES pequenos, dando uma pausa entre eles. Isso evita
+  // o travamento/tela preta quando há muitas fotos: em vez de jogar todas as
+  // imagens na tela de uma vez (o que estoura a memória do celular), a gente
+  // adiciona aos poucos, deixando o navegador respirar entre cada lote.
+  const TAMANHO_LOTE = 8;
+  let indice = 0;
+  function renderizarProximoLote() {
+    const pedaco = dadosLidos.slice(indice, indice + TAMANHO_LOTE);
+    if (pedaco.length === 0) return;
+    let html = '';
+    pedaco.forEach((r, j) => { html += htmlItem(r, indice + j); });
+    lista.insertAdjacentHTML('beforeend', html);
+    indice += TAMANHO_LOTE;
+    if (indice < dadosLidos.length) {
+      // Pausa curta antes do próximo lote (deixa a tela fluida)
+      setTimeout(renderizarProximoLote, 50);
+    }
+  }
+  renderizarProximoLote();
 }
 
 async function compartilharFoto(i) {
