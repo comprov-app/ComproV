@@ -1303,12 +1303,13 @@ function gerarMiniaturaFila(file, index) {
 // rolar de volta pro fim, o acompanhamento VOLTA a funcionar automaticamente.
 let autoScrollLigado = true;      // começa acompanhando
 let processandoEnvios = false;    // true enquanto o lote está sendo enviado
+let ignorarProximoScroll = false; // evita que o scroll automático desligue a si mesmo
 
-// Detecta se o usuário está perto do fim da página (tolerância de 150px).
+// Detecta se o usuário está perto do fim da página (tolerância generosa de 250px).
 function estaPertoDoFim() {
   const scrollBottom = window.innerHeight + window.scrollY;
   const alturaTotal = document.documentElement.scrollHeight;
-  return (alturaTotal - scrollBottom) < 150;
+  return (alturaTotal - scrollBottom) < 250;
 }
 
 // Quando o usuário rola a tela na mão, decide se acompanha ou não:
@@ -1316,15 +1317,21 @@ function estaPertoDoFim() {
 // - Voltou pro fim -> religa o acompanhamento
 function aoRolarTela() {
   if (!processandoEnvios) return;
+  // Se este evento veio do nosso próprio scroll automático, ignora (não desliga)
+  if (ignorarProximoScroll) { ignorarProximoScroll = false; return; }
   autoScrollLigado = estaPertoDoFim();
 }
 
-// Rola suavemente até o item que está sendo enviado, só se o acompanhamento
-// estiver ligado (ou seja, se o usuário não estiver mexendo pra ver outra coisa).
+// Rola até o item que está sendo enviado, só se o acompanhamento estiver ligado.
 function acompanharItem(i) {
   if (!autoScrollLigado) return;
   const linha = document.getElementById('item-row-' + i);
-  if (linha) linha.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (!linha) return;
+  ignorarProximoScroll = true;
+  // Rola a janela até deixar o item visível, um pouco acima do rodapé
+  const rect = linha.getBoundingClientRect();
+  const alvo = window.scrollY + rect.top - (window.innerHeight * 0.4);
+  window.scrollTo({ top: alvo, behavior: 'smooth' });
 }
 
 window.addEventListener('scroll', aoRolarTela, { passive: true });
