@@ -365,28 +365,12 @@
 
     <!-- ABA MENSAGEM -->
     <div id="tab-mensagem" style="display:none">
-      <div class="sec-card">
-        <div class="sec-head">
-          <span class="sec-ico">⏱️</span>
-          <span class="sec-titulo">Intervalo entre envios</span>
-        </div>
-        <div class="sec-desc">Tempo de espera entre cada comprovante</div>
-        <div class="dropdown-custom" id="dropdown-intervalo">
-          <div class="dropdown-selected" onclick="toggleDropdownIntervalo()">
-            <span id="dropdown-intervalo-label">⏱️ Automático (calculado pelo volume)</span>
-            <span class="dropdown-arrow">▼</span>
-          </div>
-          <div class="dropdown-opcoes" id="dropdown-intervalo-opcoes" style="display:none;">
-            <div class="dropdown-item" onclick="selecionarIntervalo('auto', '⏱️ Automático (calculado pelo volume)')">⏱️ Automático (calculado pelo volume)</div>
-            <div class="dropdown-item" onclick="selecionarIntervalo('3', '3 segundos')">3 segundos</div>
-            <div class="dropdown-item" onclick="selecionarIntervalo('5', '5 segundos')">5 segundos</div>
-            <div class="dropdown-item" onclick="selecionarIntervalo('8', '8 segundos')">8 segundos</div>
-            <div class="dropdown-item" onclick="selecionarIntervalo('10', '10 segundos')">10 segundos</div>
-            <div class="dropdown-item" onclick="selecionarIntervalo('15', '15 segundos')">15 segundos</div>
-          </div>
-        </div>
-        <input type="hidden" id="intervalo-envio" value="auto" />
-      </div>
+      <!-- Intervalo entre envios: TRAVADO em automático, por segurança.
+           O intervalo protege o WhatsApp do lojista contra bloqueio (envios muito
+           rápidos parecem robô pro WhatsApp). Por isso a opção NÃO é exposta ao
+           cliente: ele não pode diminuir/desligar e queimar o próprio número.
+           O cálculo automático já ajusta o tempo conforme o volume do lote. -->
+      <input type="hidden" id="intervalo-envio" value="auto" />
 
       <div class="sec-card">
         <div class="sec-head">
@@ -560,13 +544,8 @@ function saveConfig() {
   const ainst = document.getElementById('evo-instance').value.trim();
   if (asrv)  localStorage.setItem('evo_server', asrv);
   if (ainst) localStorage.setItem('evo_instance', ainst);
-  const intervaloTexto = document.getElementById('intervalo-envio').value.trim().toLowerCase();
-  if (intervaloTexto === '' || intervaloTexto === 'auto') {
-    localStorage.setItem('intervalo_envio', 'auto');
-  } else {
-    const intervaloVal = parseInt(intervaloTexto, 10);
-    localStorage.setItem('intervalo_envio', isNaN(intervaloVal) || intervaloVal < 0 ? 'auto' : String(intervaloVal));
-  }
+  // Intervalo: sempre 'auto' (a opção foi removida da tela por segurança)
+  localStorage.setItem('intervalo_envio', 'auto');
   localStorage.setItem('msg_template',  document.getElementById('msg-template').value);
   localStorage.setItem('taxa_todos_ativa', document.getElementById('taxa-todos-toggle').checked ? '1' : '0');
   const taxaTodosVal = document.getElementById('taxa-todos-valor').value.trim().replace(',', '.');
@@ -709,9 +688,10 @@ function loadConfig() {
   document.getElementById('evo-server').value    = localStorage.getItem('evo_server') || '';
   document.getElementById('evo-instance').value  = localStorage.getItem('evo_instance') || '';
   document.getElementById('codigo-acesso').value = localStorage.getItem('codigo_acesso') || '';
-  const intervaloSalvo = localStorage.getItem('intervalo_envio') || 'auto';
-  document.getElementById('intervalo-envio').value = intervaloSalvo;
-  setIntervalo(intervaloSalvo);
+  // Intervalo: força 'auto' sempre. Isso também MIGRA quem já usava o app com um
+  // intervalo manual salvo antes (ex: "3"), passando todos para o automático seguro.
+  localStorage.setItem('intervalo_envio', 'auto');
+  document.getElementById('intervalo-envio').value = 'auto';
   document.getElementById('msg-template').value      = localStorage.getItem('msg_template') || MSG_PADRAO;
   document.getElementById('taxa-todos-toggle').checked = localStorage.getItem('taxa_todos_ativa') === '1';
   document.getElementById('taxa-todos-valor').value    = localStorage.getItem('taxa_todos_valor') || '';
@@ -830,61 +810,18 @@ function salvarTaxaTodos() {
   mostrarAvisoCustomizado(ativado ? 'Cobrança de taxa para todos ativada!' : 'Cobrança de taxa para todos desativada.', '✅');
 }
 
+// ===== INTERVALO ENTRE ENVIOS: SEMPRE AUTOMÁTICO =====
+// A opção foi removida da tela de propósito (segurança): o intervalo protege o
+// WhatsApp do lojista contra bloqueio. Se ele pudesse diminuir/desligar, correria
+// o risco de queimar o próprio número. O automático calcula o tempo pelo volume.
 function setIntervalo(valor) {
-  const labels = {
-    'auto': '⏱️ Automático (calculado pelo volume)',
-    '3': '3 segundos', '5': '5 segundos', '8': '8 segundos',
-    '10': '10 segundos', '15': '15 segundos'
-  };
   const input = document.getElementById('intervalo-envio');
-  if (input) input.value = valor;
-  const label = document.getElementById('dropdown-intervalo-label');
-  if (label) label.textContent = labels[valor] || valor + ' segundos';
-  // Marca o item ativo visualmente
-  document.querySelectorAll('#dropdown-intervalo-opcoes .dropdown-item').forEach(el => {
-    el.classList.toggle('ativo', el.dataset.valor === valor);
-  });
-}
-
-function toggleDropdownIntervalo() {
-  const opcoes = document.getElementById('dropdown-intervalo-opcoes');
-  const arrow = document.querySelector('#dropdown-intervalo .dropdown-arrow');
-  const aberto = opcoes.style.display === 'block';
-  opcoes.style.display = aberto ? 'none' : 'block';
-  if (arrow) arrow.classList.toggle('aberto', !aberto);
-  // Fecha ao clicar fora
-  if (!aberto) {
-    setTimeout(() => {
-      document.addEventListener('click', function fechar(e) {
-        if (!document.getElementById('dropdown-intervalo').contains(e.target)) {
-          opcoes.style.display = 'none';
-          if (arrow) arrow.classList.remove('aberto');
-          document.removeEventListener('click', fechar);
-        }
-      });
-    }, 10);
-  }
-}
-
-function selecionarIntervalo(valor, texto) {
-  const input = document.getElementById('intervalo-envio');
-  if (input) input.value = valor;
-  const label = document.getElementById('dropdown-intervalo-label');
-  if (label) label.textContent = texto;
-  // Fecha o dropdown
-  document.getElementById('dropdown-intervalo-opcoes').style.display = 'none';
-  const arrow = document.querySelector('#dropdown-intervalo .dropdown-arrow');
-  if (arrow) arrow.classList.remove('aberto');
-  // Marca item ativo
-  document.querySelectorAll('#dropdown-intervalo-opcoes .dropdown-item').forEach(el => {
-    el.classList.toggle('ativo', el.textContent.trim() === texto);
-  });
-  // Salva
-  salvarIntervalo(valor);
+  if (input) input.value = 'auto';
+  localStorage.setItem('intervalo_envio', 'auto');
 }
 
 function salvarIntervalo(valor) {
-  localStorage.setItem('intervalo_envio', valor);
+  localStorage.setItem('intervalo_envio', 'auto');
 }
 
 function toggleAccordion(id, header) {
