@@ -1178,9 +1178,50 @@ function abrirFotoResultado(i) {
       btnEnviar.textContent = 'Enviando…';
       try {
         if (!item.file) {
-          throw new Error('DIAGNOSTICO: a foto (file) nao esta guardada neste item.');
+          throw new Error('DIAG 1: item.file vazio');
         }
-        await enviarFoto(item.file, { nome:'', telefone: telDigitado }, null, null, null);
+        // Etapa a etapa, pra localizar a falha
+        let b64;
+        try {
+          b64 = await toBase64(item.file);
+        } catch (eImg) {
+          throw new Error('DIAG 2 (converter imagem): ' + (eImg.message || eImg));
+        }
+        if (!b64) throw new Error('DIAG 3: base64 vazio apos converter');
+
+        const codigo = localStorage.getItem('codigo_acesso');
+        if (!codigo) throw new Error('DIAG 4: codigo_acesso nao encontrado no app');
+
+        let resp;
+        try {
+          resp = await fetch(`${COMPROV_BACKEND}/enviar/${encodeURIComponent(codigo)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telefone: telDigitado,
+              caption: '',
+              imagem_base64: b64,
+              mimetype: item.file.type || 'image/jpeg'
+            })
+          });
+        } catch (eNet) {
+          throw new Error('DIAG 5 (rede): ' + (eNet.message || eNet));
+        }
+
+        if (!resp.ok) {
+          let detalhe = '';
+          try { const j = await resp.json(); detalhe = j.message || JSON.stringify(j); } catch(e){}
+          throw new Error('DIAG 6 (servidor ' + resp.status + '): ' + detalhe);
+        }
+
+        // Sucesso
+        try {
+          const data = await resp.json();
+          if (data && typeof data.uso_atual === 'number') {
+            localStorage.setItem('uso_mensal_contador', String(data.uso_atual));
+          }
+        } catch(e){}
+
         item.sucesso = true;
         item.telefone = telDigitado;
         item.erro = null;
