@@ -1115,7 +1115,7 @@ function abrirFotoResultado(i) {
   const recuperarHtml = podeRecuperar
     ? `<div class="foto-rec-box">
          <input type="tel" class="foto-rec-tel" id="foto-rec-tel" inputmode="numeric"
-                placeholder="Telefone com DDD" value="${escHtml(item.telefone||'')}" />
+                placeholder="(00) 00000-0000" value="${escHtml(item.telefone||'')}" />
          <button class="foto-rec-btn" id="foto-rec-enviar">Enviar</button>
        </div>`
     : '';
@@ -1131,16 +1131,42 @@ function abrirFotoResultado(i) {
 
   function fechar() { overlay.remove(); }
   overlay.querySelector('#foto-res-fechar').addEventListener('click', fechar);
+  // Fecha ao tocar no fundo escuro — mas SO no fundo, nunca na imagem/campo/botao
   overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(); });
 
   // Botao de enviar dentro da foto ampliada
   const btnEnviar = overlay.querySelector('#foto-rec-enviar');
-  if (btnEnviar) {
-    let enviando = false;   // trava contra clique duplo / envio repetido
-    btnEnviar.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      if (enviando) return;              // ja esta enviando, ignora novo clique
-      const input = overlay.querySelector('#foto-rec-tel');
+  const input = overlay.querySelector('#foto-rec-tel');
+  if (btnEnviar && input) {
+    // Impede que cliques no campo/botao borbulhem pro overlay (que fecharia a tela)
+    input.addEventListener('click', (e) => e.stopPropagation());
+
+    // Formata enquanto digita: (XX) XXXXX-XXXX  (celular) ou (XX) XXXX-XXXX (fixo)
+    input.addEventListener('input', () => {
+      let d = input.value.replace(/\D/g, '');   // so digitos
+      if (d.length > 11) d = d.slice(0, 11);     // limita a 11 (DDD + numero)
+      let fmt = d;
+      if (d.length > 6) {
+        // 11 digitos = celular (5+4), 10 = fixo (4+4)
+        const corte = d.length > 10 ? 7 : 6;
+        fmt = '(' + d.slice(0,2) + ') ' + d.slice(2,corte) + '-' + d.slice(corte);
+      } else if (d.length > 2) {
+        fmt = '(' + d.slice(0,2) + ') ' + d.slice(2);
+      } else if (d.length > 0) {
+        fmt = '(' + d;
+      }
+      input.value = fmt;
+      input.style.borderColor = '';  // limpa o vermelho de erro ao digitar
+    });
+
+    // Se a IA leu um telefone, aplica a mascara no valor inicial tambem
+    if (input.value) {
+      input.dispatchEvent(new Event('input'));
+    }
+
+    let enviando = false;
+    async function fazerEnvio() {
+      if (enviando) return;
       const telDigitado = normalizarTelefone(input.value);
       if (telDigitado.length !== 12 && telDigitado.length !== 13) {
         input.style.borderColor = '#e0403f';
@@ -1151,10 +1177,10 @@ function abrirFotoResultado(i) {
       btnEnviar.disabled = true;
       btnEnviar.textContent = 'Enviando…';
       try {
-        // Converte a imagem UMA vez e passa pronta, evitando reprocessamento pesado
-        const b64 = await toBase64(item.file);
-        await enviarFoto(item.file, { nome:'', telefone: telDigitado }, null, null, null, b64);
-        // Marca como enviado e atualiza a lista por baixo
+        if (!item.file) {
+          throw new Error('DIAGNOSTICO: a foto (file) nao esta guardada neste item.');
+        }
+        await enviarFoto(item.file, { nome:'', telefone: telDigitado }, null, null, null);
         item.sucesso = true;
         item.telefone = telDigitado;
         item.erro = null;
@@ -1169,10 +1195,16 @@ function abrirFotoResultado(i) {
         const msg = (err && err.message) ? err.message : 'Falha ao enviar.';
         mostrarAvisoCustomizado(msg, '⚠️');
       }
+    }
+
+    btnEnviar.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      fazerEnvio();
     });
-    // Enter no campo tambem envia
-    const inp = overlay.querySelector('#foto-rec-tel');
-    if (inp) inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') btnEnviar.click(); });
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); fazerEnvio(); }
+    });
   }
 }
 
