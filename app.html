@@ -182,21 +182,22 @@
     flex-shrink: 0; white-space: nowrap;
   }
   .btn-share:hover { opacity: .85; }
-  /* Recuperar etiqueta que falhou: campo de telefone + botao enviar, na propria linha */
-  .recuperar { display:flex; gap:6px; margin-top:8px; align-items:center; }
-  .rec-tel {
-    flex:1; min-width:0; padding:8px 10px; font-size:14px;
-    border:1.5px solid #e0403f; border-radius:8px; outline:none;
-    background:var(--input-bg, #fff); color:var(--text-primary, #111);
+  /* Campo de telefone DENTRO da foto ampliada (recuperar etiqueta que falhou) */
+  .foto-rec-box {
+    display:flex; gap:8px; margin-top:18px; width:100%; max-width:420px;
+    padding:0 16px; box-sizing:border-box;
   }
-  .rec-tel:focus { border-color:#25D366; }
-  .rec-btn {
-    background:#25D366; color:#fff; border:none; border-radius:8px;
-    padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer;
+  .foto-rec-tel {
+    flex:1; min-width:0; padding:14px 14px; font-size:16px;
+    border:2px solid #25D366; border-radius:10px; outline:none;
+    background:#fff; color:#111;
+  }
+  .foto-rec-btn {
+    background:#25D366; color:#fff; border:none; border-radius:10px;
+    padding:14px 22px; font-size:15px; font-weight:700; cursor:pointer;
     flex-shrink:0; white-space:nowrap;
   }
-  .rec-btn:hover { opacity:.9; }
-  .rec-enviando { font-size:13px; color:var(--text-secondary); font-style:italic; }
+  .foto-rec-btn:disabled { opacity:.6; }
   .summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
   .summary-box { background: var(--summary-bg); border-radius:10px; padding:12px 8px; text-align:center; }
   .summary-box .num { font-size:22px; font-weight:700; }
@@ -313,9 +314,9 @@
   .foto-fullscreen-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 2100;
     display: flex; align-items: center; justify-content: center; flex-direction: column;
-    padding: 20px;
+    padding: 20px; overflow-y: auto;
   }
-  .foto-fullscreen-img { max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px; }
+  .foto-fullscreen-img { max-width: 100%; max-height: 68vh; object-fit: contain; border-radius: 8px; flex-shrink: 0; }
   .foto-fullscreen-fechar {
     position: absolute; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%;
     background: rgba(255,255,255,0.15); color: #fff; border: none; font-size: 20px; cursor: pointer;
@@ -1099,8 +1100,8 @@ function abrirFotoEmTelaCheia(index) {
 }
 
 // Abre a foto de um item JA PROCESSADO (tela de resultados) em tela cheia.
-// Util quando um envio falha: permite ver a etiqueta grande pra descobrir quem e
-// e qual o numero correto. Mostra o que a IA leu (ou o erro) embaixo da imagem.
+// Util quando um envio falha: permite ver a etiqueta GRANDE, ler o numero de
+// telefone e digitar ali mesmo, olhando pra etiqueta, e enviar sem sair.
 function abrirFotoResultado(i) {
   const item = dadosLidos[i];
   if (!item || !item.previewUrl) {
@@ -1108,11 +1109,15 @@ function abrirFotoResultado(i) {
     return;
   }
 
-  // Mostra o botão "Enviar Manualmente" dentro da tela cheia, mas só pros itens
-  // que falharam (nao faz sentido em itens ja enviados ou duplicados).
-  const mostrarBotao = !item.sucesso && !item.duplicado;
-  const botaoHtml = mostrarBotao
-    ? `<button class="btn-share" id="foto-res-enviar" style="margin-top:18px; padding:12px 24px; font-size:15px;">📤 Enviar Manualmente</button>`
+  // Pros itens que falharam, mostra o campo de telefone + enviar embaixo da foto.
+  // Assim o lojista le o numero na etiqueta ampliada e digita olhando pra ela.
+  const podeRecuperar = !item.sucesso && !item.duplicado;
+  const recuperarHtml = podeRecuperar
+    ? `<div class="foto-rec-box">
+         <input type="tel" class="foto-rec-tel" id="foto-rec-tel" inputmode="numeric"
+                placeholder="Telefone com DDD" value="${escHtml(item.telefone||'')}" />
+         <button class="foto-rec-btn" id="foto-rec-enviar">Enviar</button>
+       </div>`
     : '';
 
   const overlay = document.createElement('div');
@@ -1120,7 +1125,7 @@ function abrirFotoResultado(i) {
   overlay.innerHTML = `
     <button class="foto-fullscreen-fechar" id="foto-res-fechar">✕</button>
     <img src="${item.previewUrl}" class="foto-fullscreen-img" />
-    ${botaoHtml}
+    ${recuperarHtml}
   `;
   document.body.appendChild(overlay);
 
@@ -1128,15 +1133,63 @@ function abrirFotoResultado(i) {
   overlay.querySelector('#foto-res-fechar').addEventListener('click', fechar);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(); });
 
-  // Botao de enviar: fecha a tela cheia e dispara o compartilhamento da foto
-  const btnEnviar = overlay.querySelector('#foto-res-enviar');
+  // Botao de enviar dentro da foto ampliada
+  const btnEnviar = overlay.querySelector('#foto-rec-enviar');
   if (btnEnviar) {
-    btnEnviar.addEventListener('click', (e) => {
+    let enviando = false;   // trava contra clique duplo / envio repetido
+    btnEnviar.addEventListener('click', async (e) => {
       e.stopPropagation();
-      fechar();
-      compartilharFoto(i);
+      if (enviando) return;              // ja esta enviando, ignora novo clique
+      const input = overlay.querySelector('#foto-rec-tel');
+      const telDigitado = normalizarTelefone(input.value);
+      if (telDigitado.length !== 12 && telDigitado.length !== 13) {
+        input.style.borderColor = '#e0403f';
+        mostrarAvisoCustomizado('Digite o telefone com DDD (ex: 81 99999-9999).', '📱');
+        return;
+      }
+      enviando = true;
+      btnEnviar.disabled = true;
+      btnEnviar.textContent = 'Enviando…';
+      try {
+        // Converte a imagem UMA vez e passa pronta, evitando reprocessamento pesado
+        const b64 = await toBase64(item.file);
+        await enviarFoto(item.file, { nome:'', telefone: telDigitado }, null, null, null, b64);
+        // Marca como enviado e atualiza a lista por baixo
+        item.sucesso = true;
+        item.telefone = telDigitado;
+        item.erro = null;
+        item.falhaConexao = false;
+        atualizarLinhaResultado(i, telDigitado);
+        fechar();
+        mostrarAvisoCustomizado('Comprovante enviado!', '✅');
+      } catch (err) {
+        enviando = false;
+        btnEnviar.disabled = false;
+        btnEnviar.textContent = 'Enviar';
+        const msg = (err && err.message) ? err.message : 'Falha ao enviar.';
+        mostrarAvisoCustomizado(msg, '⚠️');
+      }
     });
+    // Enter no campo tambem envia
+    const inp = overlay.querySelector('#foto-rec-tel');
+    if (inp) inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') btnEnviar.click(); });
   }
+}
+
+// Atualiza a linha da lista de resultados quando um item e recuperado com sucesso
+function atualizarLinhaResultado(i, telefone) {
+  const linha = document.getElementById('recuperar-' + i);
+  if (linha) {
+    const info = linha.querySelector('.item-info .detail');
+    if (info) info.textContent = telefone;
+    const botao = linha.querySelector('.btn-share');
+    if (botao) botao.outerHTML = '<span class="badge badge-ok">Enviado</span>';
+  }
+  // Atualiza os contadores do topo
+  const okEl = document.getElementById('s-ok');
+  const errEl = document.getElementById('s-err');
+  if (okEl) okEl.textContent = (parseInt(okEl.textContent,10)||0) + 1;
+  if (errEl) { const n = parseInt(errEl.textContent,10)||0; if (n>0) errEl.textContent = n - 1; }
 }
 
 function gerarMiniatura(file, index) {
@@ -2156,16 +2209,18 @@ function normalizarTelefone(tel) {
   return '55' + n;
 }
 
-async function enviarFoto(file, dados, serverUrl, instanceName, apiKey) {
+async function enviarFoto(file, dados, serverUrl, instanceName, apiKey, b64Pronto) {
   // Agora o envio é feito NO SERVIDOR (rota /enviar), que usa o token da Evolution
   // escondido. O app manda o telefone + a mensagem (montada aqui) + a foto.
   // (serverUrl, instanceName e apiKey são ignorados — ficam no servidor.)
+  // b64Pronto (opcional): se a imagem JA foi convertida antes, reaproveita em vez
+  // de reprocessar do zero — evita relentidao no reenvio manual.
   const telefone = normalizarTelefone(dados.telefone);
   if (telefone.length !== 12 && telefone.length !== 13) {
     throw new Error('Número de telefone parece incompleto ou inválido. Confira a etiqueta e tente o envio manual.');
   }
   const codigo = localStorage.getItem('codigo_acesso');
-  const b64 = await toBase64(file);
+  const b64 = b64Pronto || await toBase64(file);
   const caption = montarMensagem(dados);
   const resp = await fetchComTimeout(`${COMPROV_BACKEND}/enviar/${encodeURIComponent(codigo)}`, {
     method: 'POST',
@@ -2268,17 +2323,12 @@ function showDone(ok, err) {
     } else if (r.duplicado) {
       status = `<span class="badge badge-wait">Já enviada</span>`;
     } else {
-      // Etiqueta que falhou na leitura: em vez de perder, o lojista digita
-      // o telefone aqui mesmo e envia, sem sair do app.
-      status = `
-        <div class="recuperar" id="recuperar-${i}">
-          <input type="tel" class="rec-tel" id="rec-tel-${i}" inputmode="numeric"
-                 placeholder="Telefone com DDD" value="${escHtml(r.telefone||'')}" />
-          <button class="rec-btn" onclick="enviarRecuperado(${i})">Enviar</button>
-        </div>`;
+      // Etiqueta que falhou: convida a tocar na foto pra ver a etiqueta grande
+      // e digitar o telefone olhando pra ela.
+      status = `<button class="btn-share" onclick="abrirFotoResultado(${i})">📷 Ver foto e digitar telefone</button>`;
     }
     return `
-    <div class="item-row">
+    <div class="item-row" id="recuperar-${i}">
       <img class="item-thumb" src="${r.thumbComprimida || r.previewUrl}" loading="lazy" onclick="abrirFotoResultado(${i})" style="cursor:pointer;" title="Toque para ampliar" />
       <div class="item-info">
         <div class="name">${escHtml(r.nome||'?')}</div>
@@ -2307,66 +2357,6 @@ function showDone(ok, err) {
     }
   }
   renderizarProximoLote();
-}
-
-// Envia uma etiqueta que FALHOU na leitura, usando o telefone digitado a mao
-// pelo lojista ali na tela de resultado. Reaproveita o mesmo envio do backend
-// (conta uso, respeita limite) — a mensagem vai SEM nome, so a foto + telefone.
-async function enviarRecuperado(i) {
-  const item = dadosLidos[i];
-  if (!item || !item.file) {
-    mostrarAvisoCustomizado('Foto não disponível.', '⚠️');
-    return;
-  }
-  const input = document.getElementById('rec-tel-' + i);
-  const box = document.getElementById('recuperar-' + i);
-  if (!input) return;
-
-  const telDigitado = normalizarTelefone(input.value);
-  if (telDigitado.length !== 12 && telDigitado.length !== 13) {
-    input.style.borderColor = '#e0403f';
-    mostrarAvisoCustomizado('Digite o telefone com DDD (ex: 81 99999-9999).', '📱');
-    return;
-  }
-
-  // Trava o botão enquanto envia
-  if (box) box.innerHTML = '<span class="rec-enviando">Enviando…</span>';
-
-  try {
-    // Monta os dados com o telefone digitado, sem nome (nome vazio)
-    const dadosEnvio = { nome: '', telefone: telDigitado };
-    await enviarFoto(item.file, dadosEnvio, null, null, null);
-
-    // Marca como enviado e atualiza a linha
-    item.sucesso = true;
-    item.telefone = telDigitado;
-    item.erro = null;
-    if (box) {
-      const linha = box.closest('.item-row');
-      if (linha) {
-        const info = linha.querySelector('.item-info .detail');
-        if (info) info.textContent = telDigitado;
-      }
-      box.outerHTML = '<span class="badge badge-ok">Enviado</span>';
-    }
-
-    // Atualiza o contador do topo (Enviadas / Erros)
-    const okAtual = parseInt(document.getElementById('s-ok').textContent, 10) || 0;
-    const errAtual = parseInt(document.getElementById('s-err').textContent, 10) || 0;
-    document.getElementById('s-ok').textContent = okAtual + 1;
-    if (errAtual > 0) document.getElementById('s-err').textContent = errAtual - 1;
-
-  } catch (e) {
-    // Deu erro no envio: devolve o campo pra tentar de novo
-    const msg = (e && e.message) ? e.message : 'Falha ao enviar.';
-    if (box) {
-      box.innerHTML = `
-        <input type="tel" class="rec-tel" id="rec-tel-${i}" inputmode="numeric"
-               placeholder="Telefone com DDD" value="${escHtml(telDigitado)}" />
-        <button class="rec-btn" onclick="enviarRecuperado(${i})">Enviar</button>`;
-    }
-    mostrarAvisoCustomizado(msg, '⚠️');
-  }
 }
 
 async function compartilharFoto(i) {
