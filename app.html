@@ -584,7 +584,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '5.92.0';
+const APP_VERSION = '5.93.0';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -1233,10 +1233,12 @@ function abrirFotoResultado(i) {
         fechar();
         mostrarAvisoCustomizado('Comprovante enviado!', '✅');
       } catch (err) {
-        enviando = false;
-        btnEnviar.disabled = false;
-        btnEnviar.textContent = 'Enviar';
+        // Fecha a foto tambem no erro (o cliente ve a mensagem clara e reabre se quiser tentar)
         const msg = (err && err.message) ? err.message : 'Não foi possível enviar. Tente novamente.';
+        // Guarda a ultima mensagem de erro no item pra aparecer na lista
+        item.erro = msg;
+        atualizarLinhaResultadoErro(i, msg);
+        fechar();
         mostrarAvisoCustomizado(msg, '⚠️');
       }
     }
@@ -1266,6 +1268,16 @@ function atualizarLinhaResultado(i, telefone) {
   const errEl = document.getElementById('s-err');
   if (okEl) okEl.textContent = (parseInt(okEl.textContent,10)||0) + 1;
   if (errEl) { const n = parseInt(errEl.textContent,10)||0; if (n>0) errEl.textContent = n - 1; }
+}
+
+// Atualiza a linha quando uma TENTATIVA de recuperacao FALHOU — mostra o motivo
+// e mantem o botao pra o lojista tentar de novo (com telefone diferente, etc.)
+function atualizarLinhaResultadoErro(i, mensagem) {
+  const linha = document.getElementById('recuperar-' + i);
+  if (linha) {
+    const info = linha.querySelector('.item-info .detail');
+    if (info) info.textContent = mensagem;
+  }
 }
 
 function gerarMiniatura(file, index) {
