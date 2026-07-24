@@ -584,7 +584,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '5.93.0';
+const APP_VERSION = '5.94.0';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2270,15 +2270,25 @@ async function lerEtiqueta(file, apiKey) {
   const resp = await fetchComTimeout(`${COMPROV_BACKEND}/ler/${encodeURIComponent(codigo)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imagem_base64: b64, mimetype: file.type || 'image/jpeg' })
+    // O toBase64 SEMPRE devolve JPEG (canvas.toDataURL('image/jpeg')).
+    // Declarar o tipo original (ex: HEIC do iPhone) fazia a IA recusar a imagem.
+    body: JSON.stringify({ imagem_base64: b64, mimetype: 'image/jpeg' })
   }, 30000, 'Tempo de leitura esgotado. Verifique sua conexão e tente novamente.');
   if (resp.status === 409) {
     throw new Error('Limite de envios do plano atingido.');
   }
-  if (!resp.ok) throw new Error('Não foi possível ler esta etiqueta. Use uma foto mais nítida e tente novamente.');
+  if (!resp.ok) {
+    // Usa a mensagem REAL do servidor (ele sabe a causa: limite, formato, etc).
+    let msg = 'Não foi possível ler esta etiqueta. Tente novamente.';
+    try {
+      const errJson = await resp.json();
+      if (errJson && errJson.message) msg = errJson.message;
+    } catch(e){ /* mantem a mensagem padrao */ }
+    throw new Error(msg);
+  }
   const data = await resp.json();
   if (!data || !data.dados) {
-    throw new Error('Não foi possível ler esta etiqueta. Use uma foto mais nítida e tente novamente.');
+    throw new Error('Não consegui identificar os dados nesta etiqueta. Confira se a etiqueta impressa aparece inteira na foto.');
   }
   return data.dados;
 }
@@ -2688,19 +2698,12 @@ function toBase64(file) {
           return;
         }
 
-        const isLandscape = w > h;
-        if (isLandscape) {
-          // Rotaciona 90 graus para deixar vertical
-          canvas.width = h;
-          canvas.height = w;
-          ctx.translate(canvas.width / 2, canvas.height / 2);
-          ctx.rotate(90 * Math.PI / 180);
-          ctx.drawImage(img, -w / 2, -h / 2, w, h);
-        } else {
-          canvas.width = w;
-          canvas.height = h;
-          ctx.drawImage(img, 0, 0, w, h);
-        }
+        // NAO rotacionamos a imagem: a IA le texto em qualquer orientacao, e girar
+        // as cegas (so porque a largura > altura) virava etiquetas que ja estavam
+        // corretas, fazendo a leitura falhar. O WhatsApp respeita o EXIF na exibicao.
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
 
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         if (!dataUrl || dataUrl === 'data:,') {
