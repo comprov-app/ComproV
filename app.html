@@ -361,7 +361,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v5.91.0</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao"></span></div>
 </div>
 
 <div class="container">
@@ -582,14 +582,14 @@ function saveConfig() {
 
 // ===== ATIVAÇÃO POR CÓDIGO ÚNICO =====
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
-// Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
-// Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '5.94.0';
-// Preenche o rodape do menu assim que o script carrega
-document.addEventListener('DOMContentLoaded', () => {
+// Versao do app (fonte unica no app.html). Ao lancar, atualize AQUI e tambem no
+// service-worker.js (APP_VERSION), que controla o cache do PWA offline.
+const APP_VERSION = '5.95.0';
+// Preenche o rodape do menu (o elemento ja existe acima deste script no HTML)
+(function preencherVersao(){
   const el = document.getElementById('app-versao');
   if (el) el.textContent = 'v' + APP_VERSION;
-});
+})();
 
 async function ativarPorCodigo() {
   const campo = document.getElementById('codigo-acesso');
@@ -840,20 +840,9 @@ function salvarTaxaTodos() {
   mostrarAvisoCustomizado(ativado ? 'Cobrança de taxa para todos ativada!' : 'Cobrança de taxa para todos desativada.', '✅');
 }
 
-// ===== INTERVALO ENTRE ENVIOS: SEMPRE AUTOMÁTICO =====
-// A opção foi removida da tela de propósito (segurança): o intervalo protege o
-// WhatsApp do lojista contra bloqueio. Se ele pudesse diminuir/desligar, correria
-// o risco de queimar o próprio número. O automático calcula o tempo pelo volume.
-function setIntervalo(valor) {
-  const input = document.getElementById('intervalo-envio');
-  if (input) input.value = 'auto';
-  localStorage.setItem('intervalo_envio', 'auto');
-}
-
-function salvarIntervalo(valor) {
-  localStorage.setItem('intervalo_envio', 'auto');
-}
-
+// Nota: o intervalo entre envios é sempre 'auto' (forçado em loadConfig/saveConfig
+// e calculado pelo volume em startProcessing). A opção não é exposta na tela de
+// propósito — deixar o lojista reduzir/desligar arriscaria bloqueio do WhatsApp dele.
 function toggleAccordion(id, header) {
   const body = document.getElementById(id);
   const arrow = header.querySelector('.accordion-arrow');
@@ -867,10 +856,6 @@ function toggleAccordion(id, header) {
     body.style.maxHeight = body.scrollHeight + 'px';
     if (arrow) arrow.classList.add('aberto');
   }
-}
-
-function setLimitePlano(valor) {
-  // Plano agora é definido no painel admin (backend). Função mantida por compatibilidade.
 }
 
 function inserirTag(tag) {
@@ -1760,143 +1745,6 @@ function limiteJaFoiDefinido() {
   return localStorage.getItem('limite_mensal') !== null && localStorage.getItem('limite_mensal') !== '';
 }
 
-function salvarLimiteMensal() {
-  // Plano/limite agora vêm do painel admin (backend). Função mantida por compatibilidade.
-}
-
-const SENHA_ADMIN_LIMITE = '6DOfJ9cv6RQJ\\7vP.e{6|RMZX7£1\\o';
-
-// Fallback para navegadores sem suporte a BarcodeDetector (ex: Safari/iOS).
-// Em vez de escanear o QR Code pela câmera, permite digitar a senha de administrador
-// manualmente — mesma proteção, caminho diferente, garantindo que o recurso funcione em todo dispositivo.
-function abrirEntradaSenhaManual(callback) {
-  const overlay = document.createElement('div');
-  overlay.className = 'qr-modal-overlay';
-  overlay.innerHTML = `
-    <div class="qr-modal-box">
-      <p style="font-size:14px; color:var(--text-primary); margin-bottom:12px;">Digite a senha de administrador:</p>
-      <input type="password" id="senha-manual-input" placeholder="Senha" autocomplete="off" data-lpignore="true" data-1p-ignore style="margin-bottom:14px;" />
-      <div style="display:flex; gap:8px;">
-        <button class="btn btn-gray" id="senha-manual-cancelar" style="flex:1;">Cancelar</button>
-        <button class="btn btn-green" id="senha-manual-confirmar" style="flex:1;">Confirmar</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  const inputEl = overlay.querySelector('#senha-manual-input');
-  setTimeout(() => inputEl.focus(), 100);
-
-  function confirmar() {
-    const valor = inputEl.value;
-    overlay.remove();
-    if (valor === SENHA_ADMIN_LIMITE) {
-      callback(true);
-    } else {
-      mostrarAvisoCustomizado('Senha incorreta.', '❌');
-      callback(false);
-    }
-  }
-
-  overlay.querySelector('#senha-manual-confirmar').addEventListener('click', confirmar);
-  overlay.querySelector('#senha-manual-cancelar').addEventListener('click', () => { overlay.remove(); callback(false); });
-  inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirmar(); });
-}
-
-// Abre a câmera, lê um QR Code e chama callback(true) se o conteúdo lido
-// for igual à senha de administrador, ou callback(false) se cancelar/falhar.
-function abrirLeitorQrAdmin(callback) {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    mostrarAvisoCustomizado('Este dispositivo/navegador não tem suporte à câmera. Não é possível ler o QR Code.', '🚫');
-    callback(false);
-    return;
-  }
-
-  if (!('BarcodeDetector' in window)) {
-    abrirEntradaSenhaManual(callback);
-    return;
-  }
-
-  const overlay = document.createElement('div');
-  overlay.className = 'qr-modal-overlay';
-  overlay.innerHTML = `
-    <div class="qr-modal-box">
-      <video id="qr-video" playsinline muted></video>
-      <div class="qr-modal-status" id="qr-status"></div>
-      <button class="btn btn-gray" id="qr-cancelar">Cancelar</button>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  const video = overlay.querySelector('#qr-video');
-  const statusEl = overlay.querySelector('#qr-status');
-  let stream = null;
-  let pararLeitura = false;
-
-  function encerrar(resultado) {
-    pararLeitura = true;
-    if (stream) stream.getTracks().forEach(t => t.stop());
-    overlay.remove();
-    callback(resultado);
-  }
-
-  overlay.querySelector('#qr-cancelar').addEventListener('click', () => encerrar(false));
-
-  const detector = new BarcodeDetector({ formats: ['qr_code'] });
-
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    .then((mediaStream) => {
-      stream = mediaStream;
-      video.srcObject = stream;
-      video.play();
-
-      async function tick() {
-        if (pararLeitura) return;
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-          try {
-            const codigos = await detector.detect(video);
-            if (codigos && codigos.length > 0) {
-              const valorLido = codigos[0].rawValue;
-              if (valorLido === SENHA_ADMIN_LIMITE) {
-                statusEl.textContent = '✅ QR Code válido!';
-                setTimeout(() => encerrar(true), 400);
-                return;
-              } else {
-                statusEl.textContent = '❌ QR Code lido, mas não é o correto. Tente novamente.';
-              }
-            }
-          } catch (e) {
-            // Falha pontual na detecção de um frame não é erro fatal — tenta o próximo frame
-          }
-        }
-        requestAnimationFrame(tick);
-      }
-      requestAnimationFrame(tick);
-    })
-    .catch((err) => {
-      statusEl.textContent = '❌ Não foi possível acessar a câmera: ' + err.message;
-      setTimeout(() => encerrar(false), 2000);
-    });
-}
-
-function destrancarLimite() {
-  // Edição de limite removida — o plano agora é controlado no painel admin (backend).
-}
-
-function resetarContadorMensal() {
-  abrirLeitorQrAdmin((autorizado) => {
-    if (!autorizado) return;
-    confirmarCustomizado('Resetar o contador de uso deste mês para 0?', (confirmou) => {
-      if (confirmou) {
-        localStorage.setItem('uso_mensal_mes', obterIdentificadorCicloAtual());
-        localStorage.setItem('uso_mensal_contador', '0');
-        atualizarResumoUsoMensal();
-        mostrarAvisoCustomizado('Contador resetado!', '✅');
-      }
-    }, '🔄');
-  });
-}
-
 function atualizarResumoUsoMensal() {
   const usoEl = document.getElementById('uso-mensal-numero');
   const barraEl = document.getElementById('uso-mensal-barra');
@@ -2354,30 +2202,6 @@ function ehFalhaDeConexao(mensagem) {
          msg.includes('falha de conexão') || msg.includes('falha de conexao') ||
          msg.includes('verifique sua conexão') || msg.includes('verifique sua conexao') ||
          msg.includes('verifique sua internet');
-}
-
-async function enviarMensagem(dados, serverUrl, instanceName, apiKey) {
-  // Envio de texto puro NO SERVIDOR (rota /enviar com apenas_texto).
-  const telefone = normalizarTelefone(dados.telefone);
-  const mensagem = montarMensagem(dados);
-  const codigo = localStorage.getItem('codigo_acesso');
-  const resp = await fetch(`${COMPROV_BACKEND}/enviar/${encodeURIComponent(codigo)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ telefone: telefone, caption: mensagem, apenas_texto: true })
-  });
-  if (resp.status === 409) {
-    throw new Error('Limite de envios do plano atingido.');
-  }
-  if (!resp.ok) {
-    throw new Error('Falha ao enviar a mensagem. Verifique sua conexão e tente novamente.');
-  }
-  try {
-    const data = await resp.json();
-    if (data && typeof data.uso_atual === 'number') {
-      localStorage.setItem('uso_mensal_contador', String(data.uso_atual));
-    }
-  } catch (e) {}
 }
 
 function montarMensagem(dados) {
