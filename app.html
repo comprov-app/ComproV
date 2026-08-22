@@ -342,6 +342,16 @@
   .btn-mini-enviar { flex: 1; padding: 8px 6px; border: none; border-radius: 8px; background: var(--cor-loja,#3a3f44); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
   .btn-mini-enviar:disabled { opacity: .6; cursor: default; }
   .btn-mini-x { width: 34px; border: 1px solid var(--border-color,#ddd); border-radius: 8px; background: transparent; color: #999; font-size: 13px; cursor: pointer; }
+  /* Aviso que sobe de baixo quando chegam fotos novas na coleta */
+  #coleta-toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 200px); opacity: 0;
+    z-index: 9999; display: flex; align-items: center; gap: 12px; width: 340px; max-width: 90vw;
+    background: #1e8449; color: #fff; padding: 14px 18px; border-radius: 14px; cursor: pointer;
+    box-shadow: 0 8px 28px rgba(0,0,0,.32); transition: transform .42s cubic-bezier(.2,.85,.25,1), opacity .3s; }
+  #coleta-toast.mostra { transform: translate(-50%, 0); opacity: 1; }
+  #coleta-toast .ct-ic { font-size: 26px; flex: 0 0 auto; }
+  #coleta-toast .ct-txt { font-weight: 700; line-height: 1.3; font-size: 14.5px; }
+  #coleta-toast .ct-txt small { display: block; font-weight: 500; opacity: .9; font-size: 12px; margin-top: 1px; }
+  @media (prefers-reduced-motion: reduce) { #coleta-toast { transition: opacity .3s; } }
 </style>
 </head>
 <body>
@@ -370,7 +380,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.1.2</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.1.3</span></div>
 </div>
 
 <div class="container">
@@ -620,7 +630,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.1.2';
+const APP_VERSION = '6.1.3';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2179,6 +2189,44 @@ function coletaStatus(msg){
   el.innerHTML = msg;
 }
 
+// Aviso que sobe de baixo quando chegam fotos novas na coleta.
+let coletaToastTimer;
+function mostrarColetaToast(qtd){
+  let t = document.getElementById('coleta-toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'coleta-toast';
+    t.onclick = function(){ esconderColetaToast(); menuIr('coleta'); };
+    document.body.appendChild(t);
+  }
+  const frase = qtd === 1 ? 'Chegou 1 foto nova na coleta!' : 'Chegaram ' + qtd + ' fotos novas na coleta!';
+  t.innerHTML = '<span class="ct-ic">📥</span><span class="ct-txt">' + frase + '<small>Toque para ver e enviar</small></span>';
+  requestAnimationFrame(function(){ t.classList.add('mostra'); });
+  clearTimeout(coletaToastTimer);
+  coletaToastTimer = setTimeout(esconderColetaToast, 7000);
+}
+function esconderColetaToast(){
+  const t = document.getElementById('coleta-toast');
+  if(t) t.classList.remove('mostra');
+}
+
+// Ao abrir o app: verifica se chegaram fotos NOVAS (desde a última vez que o dono
+// olhou a coleta) e, se sim, mostra o aviso subindo de baixo com a quantidade.
+async function verificarColetaNovas(){
+  const codigo = localStorage.getItem('codigo_acesso');
+  if(!codigo) return;
+  try {
+    const r = await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/fotos`);
+    if(!r.ok) return;
+    const d = await r.json();
+    const fotos = (d && d.fotos) || [];
+    if(!fotos.length) return;
+    const maiorVista = parseInt(localStorage.getItem('coleta_maior_id_vista') || '0', 10);
+    const novas = fotos.filter(f => f.id > maiorVista).length;
+    if(novas > 0) mostrarColetaToast(novas);
+  } catch(e){ /* sem internet: nao avisa, tudo bem */ }
+}
+
 async function carregarColeta(){
   const codigo = localStorage.getItem('codigo_acesso');
   if(!codigo) return;
@@ -2205,6 +2253,11 @@ async function listarFotosColeta(){
     const d = await r.json();
     coletaFotos = (d && d.fotos) || [];
   } catch(e){ coletaFotos = []; }
+  // Marca as fotos atuais como "vistas": o aviso só notifica as que chegarem depois.
+  if(coletaFotos.length){
+    const maxId = coletaFotos.reduce((m,f) => f.id > m ? f.id : m, 0);
+    try{ localStorage.setItem('coleta_maior_id_vista', String(maxId)); }catch(e){}
+  }
   grid.innerHTML = '';
   coletaFotos.forEach(f => {
     const div = document.createElement('div');
@@ -2836,6 +2889,8 @@ if (localStorage.getItem('codigo_acesso')) {
       mostrarAvisoCustomizado(txt, '🚫');
     }
   });
+  // Avisa (subindo de baixo) se chegaram fotos novas na coleta desde a ultima visita
+  setTimeout(verificarColetaNovas, 1200);
 }
 
 // Tela inicial inteligente: se a loja ainda não foi ativada (sem código salvo),
