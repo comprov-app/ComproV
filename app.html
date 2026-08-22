@@ -334,6 +334,14 @@
     color: #ddd; font-size: 13px; margin-bottom: 12px; text-align: center; max-width: 90%;
     word-break: break-word;
   }
+  /* ===== Coleta de fotos ===== */
+  #coleta-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 6px; }
+  .coleta-item { border: 1px solid var(--border-color,#e6e6e1); border-radius: 12px; overflow: hidden; background: var(--tab-bg,#f5f5f0); }
+  .coleta-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+  .coleta-acoes { display: flex; gap: 6px; padding: 7px; }
+  .btn-mini-enviar { flex: 1; padding: 8px 6px; border: none; border-radius: 8px; background: var(--cor-loja,#3a3f44); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-mini-enviar:disabled { opacity: .6; cursor: default; }
+  .btn-mini-x { width: 34px; border: 1px solid var(--border-color,#ddd); border-radius: 8px; background: transparent; color: #999; font-size: 13px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -356,6 +364,7 @@
   </div>
   <div class="menu-itens">
     <button class="menu-item" onclick="menuIr('enviar')"><span class="ico">📷</span> Enviar</button>
+    <button class="menu-item" onclick="menuIr('coleta')"><span class="ico">📥</span> Coleta de fotos</button>
     <button class="menu-item" onclick="menuIr('mensagem')"><span class="ico">💬</span> Mensagem</button>
     <button class="menu-item" onclick="menuIr('plano')"><span class="ico">📦</span> Seu Plano</button>
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
@@ -365,6 +374,33 @@
 </div>
 
 <div class="container">
+
+  <!-- ========== COLETA DE FOTOS ========== -->
+  <div class="section" id="sec-coleta">
+    <div class="card">
+      <div class="card-title">📥 Coleta de fotos</div>
+      <p style="font-size:13px; color:#888; margin:-4px 0 14px;">Um funcionário pode enviar as fotos das etiquetas por um link, sem acessar o app. As fotos chegam aqui, prontas pra você enviar.</p>
+
+      <div style="font-size:12px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:#999;">Seu link de coleta</div>
+      <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+        <input id="coleta-link" readonly value="Gerando…" style="flex:1; min-width:0; padding:11px 12px; border:1px solid var(--border-color,#ddd); border-radius:10px; background:var(--tab-bg,#f5f5f0); color:var(--text-primary); font-size:13px;">
+        <button class="btn btn-green" id="coleta-copiar" onclick="copiarLinkColeta()" style="width:auto; margin:0; padding:11px 16px;">Copiar</button>
+      </div>
+      <p style="font-size:12.5px; color:#888; margin-top:9px; line-height:1.5;">📤 Passe este link pro seu funcionário. As fotos que ele mandar aparecem aqui embaixo. Se um funcionário sair, gere um link novo e o antigo para de funcionar.</p>
+      <button class="btn" id="coleta-renovar" onclick="renovarLinkColeta()" style="background:transparent; border:1.5px solid var(--border-color,#ccc); color:var(--text-primary); margin-top:6px;">🔄 Gerar link novo</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span id="coleta-fotos-tit">📷 Fotos recebidas</span>
+        <button onclick="carregarColeta()" style="background:transparent; border:none; color:var(--cor-loja,#3a3f44); font-size:13px; font-weight:700; cursor:pointer;">Atualizar</button>
+      </div>
+      <div id="coleta-status" class="alert alert-warn" style="display:none; margin-bottom:12px;"></div>
+      <div class="thumb-grid" id="coleta-grid"></div>
+      <div id="coleta-vazio" style="text-align:center; color:#999; padding:26px 10px; font-size:14px;">Nenhuma foto recebida ainda.<br>Assim que o funcionário enviar, aparece aqui.</div>
+    </div>
+    <button class="btn btn-green" id="coleta-enviar-todas" onclick="enviarTodasColeta()" style="display:none;">📲 Enviar todas</button>
+  </div>
 
   <!-- ========== PAINEL ========== -->
   <div class="section" id="sec-painel">
@@ -922,6 +958,9 @@ function menuIr(destino) {
   fecharMenu();
   if (destino === 'enviar') {
     setSection('sec-upload');
+  } else if (destino === 'coleta') {
+    setSection('sec-coleta');
+    carregarColeta();
   } else if (destino === 'historico') {
     abrirHistorico();
   } else if (destino === 'mensagem') {
@@ -2124,6 +2163,176 @@ async function fetchComTimeout(url, options, timeoutMs, mensagemTimeout) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// ===================================================================
+// ===== COLETA DE FOTOS (fotos que o funcionario enviou pelo link) ===
+// ===================================================================
+let coletaFotos = [];      // [{id, mimetype, criada_em}]
+let coletaEnviando = false;
+
+function coletaStatus(msg){
+  const el = document.getElementById('coleta-status');
+  if(!el) return;
+  if(!msg){ el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML = msg;
+}
+
+async function carregarColeta(){
+  const codigo = localStorage.getItem('codigo_acesso');
+  if(!codigo) return;
+  coletaStatus('');
+  // 1) link de coleta (cria na primeira vez)
+  try {
+    const r = await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/link`);
+    const d = await r.json();
+    if(r.ok && d.token){
+      document.getElementById('coleta-link').value = `${COMPROV_BACKEND}/coleta/${d.token}`;
+    } else {
+      document.getElementById('coleta-link').value = 'Erro ao carregar o link';
+    }
+  } catch(e){ document.getElementById('coleta-link').value = 'Sem conexão'; }
+  // 2) fotos recebidas
+  await listarFotosColeta();
+}
+
+async function listarFotosColeta(){
+  const codigo = localStorage.getItem('codigo_acesso');
+  const grid = document.getElementById('coleta-grid');
+  try {
+    const r = await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/fotos`);
+    const d = await r.json();
+    coletaFotos = (d && d.fotos) || [];
+  } catch(e){ coletaFotos = []; }
+  grid.innerHTML = '';
+  coletaFotos.forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'coleta-item';
+    div.id = 'coleta-item-' + f.id;
+    div.innerHTML =
+      `<img src="${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/foto/${f.id}/img" alt="" loading="lazy">` +
+      `<div class="coleta-acoes">` +
+        `<button class="btn-mini-enviar" onclick="enviarFotoColeta(${f.id})">Enviar</button>` +
+        `<button class="btn-mini-x" onclick="descartarFotoColeta(${f.id})" title="Descartar">✕</button>` +
+      `</div>`;
+    grid.appendChild(div);
+  });
+  atualizarUIColeta();
+}
+
+function atualizarUIColeta(){
+  const vazio = document.getElementById('coleta-vazio');
+  const btnTodas = document.getElementById('coleta-enviar-todas');
+  const tit = document.getElementById('coleta-fotos-tit');
+  if(coletaFotos.length === 0){
+    vazio.style.display = 'block';
+    btnTodas.style.display = 'none';
+    tit.textContent = '📷 Fotos recebidas';
+  } else {
+    vazio.style.display = 'none';
+    tit.textContent = `📷 Fotos recebidas (${coletaFotos.length})`;
+    btnTodas.style.display = coletaEnviando ? 'none' : 'block';
+    btnTodas.textContent = `📲 Enviar todas (${coletaFotos.length})`;
+  }
+}
+
+function copiarLinkColeta(){
+  const inp = document.getElementById('coleta-link');
+  const v = inp.value;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(v).then(()=>coletaStatus('✅ Link copiado! Mande pro seu funcionário.'),
+      ()=>{ inp.select(); coletaStatus('Selecione e copie o link.'); });
+  } else { inp.select(); try{ document.execCommand('copy'); coletaStatus('✅ Link copiado!'); }catch(e){ coletaStatus('Selecione e copie o link.'); } }
+}
+
+async function renovarLinkColeta(){
+  if(!confirm('Gerar um link novo? O link antigo vai parar de funcionar na hora.')) return;
+  const codigo = localStorage.getItem('codigo_acesso');
+  try {
+    const r = await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/renovar-link`, { method:'POST' });
+    const d = await r.json();
+    if(r.ok && d.token){
+      document.getElementById('coleta-link').value = `${COMPROV_BACKEND}/coleta/${d.token}`;
+      coletaStatus('✅ Link novo gerado. Passe o novo link pro funcionário.');
+    } else coletaStatus('⚠️ Não consegui gerar o link novo.');
+  } catch(e){ coletaStatus('⚠️ Erro de conexão.'); }
+}
+
+// Envia UMA foto coletada: pega a imagem, lê a etiqueta, envia o comprovante e
+// apaga do cofre. Reaproveita as rotas /ler e /enviar e o montarMensagem do app.
+async function enviarFotoColeta(id, silencioso){
+  const codigo = localStorage.getItem('codigo_acesso');
+  const item = document.getElementById('coleta-item-' + id);
+  const btn = item ? item.querySelector('.btn-mini-enviar') : null;
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const rImg = await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/foto/${id}`);
+    if(!rImg.ok) throw new Error('Foto não encontrada (pode ter expirado). Toque em Atualizar.');
+    const dImg = await rImg.json();
+    const b64 = dImg.imagem_base64;
+
+    const rLer = await fetch(`${COMPROV_BACKEND}/ler/${encodeURIComponent(codigo)}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ imagem_base64:b64, mimetype:'image/jpeg' })
+    });
+    if(rLer.status === 409) throw new Error('Limite de envios do plano atingido.');
+    const dLer = await rLer.json().catch(()=>null);
+    if(!rLer.ok || !dLer || !dLer.dados) throw new Error((dLer && dLer.message) || 'Não consegui ler esta etiqueta.');
+    const dados = dLer.dados;
+
+    const telefone = normalizarTelefone(dados.telefone);
+    if(telefone.length !== 12 && telefone.length !== 13) throw new Error(`Telefone da etiqueta parece inválido (${dados.nome||'sem nome'}). Envie manual pelo "Enviar".`);
+    const caption = montarMensagem(dados);
+
+    const rEnv = await fetch(`${COMPROV_BACKEND}/enviar/${encodeURIComponent(codigo)}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ telefone, caption, imagem_base64:b64, mimetype:'image/jpeg' })
+    });
+    if(rEnv.status === 409) throw new Error('Limite de envios do plano atingido.');
+    const dEnv = await rEnv.json().catch(()=>null);
+    if(!rEnv.ok) throw new Error((dEnv && dEnv.message) || 'Falha ao enviar. Verifique a conexão.');
+    if(dEnv && typeof dEnv.uso_atual === 'number') localStorage.setItem('uso_mensal_contador', String(dEnv.uso_atual));
+
+    // enviou: apaga do cofre e some da tela
+    await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/foto/${id}`, { method:'DELETE' }).catch(()=>{});
+    coletaFotos = coletaFotos.filter(f => f.id !== id);
+    if(item) item.remove();
+    atualizarUIColeta();
+    if(!silencioso) coletaStatus(`✅ Comprovante enviado para ${dados.nome || 'o cliente'}.`);
+    return true;
+  } catch(e){
+    if(btn){ btn.disabled = false; btn.textContent = 'Enviar'; }
+    if(!silencioso) coletaStatus('⚠️ ' + e.message);
+    return { erro: e.message };
+  }
+}
+
+async function enviarTodasColeta(){
+  if(coletaEnviando || !coletaFotos.length) return;
+  coletaEnviando = true;
+  document.getElementById('coleta-enviar-todas').style.display = 'none';
+  const ids = coletaFotos.map(f => f.id);
+  let ok = 0, err = 0;
+  for(let i = 0; i < ids.length; i++){
+    coletaStatus(`📤 Enviando ${i+1} de ${ids.length}…`);
+    const r = await enviarFotoColeta(ids[i], true);
+    if(r === true) ok++; else err++;
+  }
+  coletaEnviando = false;
+  atualizarUIColeta();
+  coletaStatus(`✅ Enviados: ${ok}.${err ? ` ${err} ficaram na lista (confira o telefone e envie manual).` : ''}`);
+}
+
+async function descartarFotoColeta(id){
+  if(!confirm('Descartar esta foto? Ela não será enviada.')) return;
+  const codigo = localStorage.getItem('codigo_acesso');
+  try {
+    await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/foto/${id}`, { method:'DELETE' });
+    coletaFotos = coletaFotos.filter(f => f.id !== id);
+    const item = document.getElementById('coleta-item-' + id); if(item) item.remove();
+    atualizarUIColeta();
+  } catch(e){ coletaStatus('⚠️ Não consegui descartar. Tente de novo.'); }
 }
 
 async function lerEtiqueta(file, apiKey) {
