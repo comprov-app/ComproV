@@ -370,7 +370,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.1.0</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.1.1</span></div>
 </div>
 
 <div class="container">
@@ -379,14 +379,14 @@
   <div class="section" id="sec-coleta">
     <div class="card">
       <div class="card-title">📥 Coleta de fotos</div>
-      <p style="font-size:13px; color:#888; margin:-4px 0 14px;">Um funcionário pode enviar as fotos das etiquetas por um link, sem acessar o app. As fotos chegam aqui, prontas pra você enviar.</p>
+      <p style="font-size:13px; color:#888; margin:-4px 0 14px;">Um colaborador pode enviar as fotos das etiquetas por um link, sem acessar o app. As fotos chegam aqui, prontas pra você enviar.</p>
 
       <div style="font-size:12px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:#999;">Seu link de coleta</div>
       <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
         <input id="coleta-link" readonly value="Gerando…" style="flex:1; min-width:0; padding:11px 12px; border:1px solid var(--border-color,#ddd); border-radius:10px; background:var(--tab-bg,#f5f5f0); color:var(--text-primary); font-size:13px;">
         <button class="btn btn-green" id="coleta-copiar" onclick="copiarLinkColeta()" style="width:auto; margin:0; padding:11px 16px;">Copiar</button>
       </div>
-      <p style="font-size:12.5px; color:#888; margin-top:9px; line-height:1.5;">📤 Passe este link pro seu funcionário. As fotos que ele mandar aparecem aqui embaixo. Se um funcionário sair, gere um link novo e o antigo para de funcionar.</p>
+      <p style="font-size:12.5px; color:#888; margin-top:9px; line-height:1.5;">📤 Passe este link pro seu colaborador. As fotos que ele mandar aparecem aqui embaixo. Se um colaborador sair, gere um link novo e o antigo para de funcionar.</p>
       <button class="btn" id="coleta-renovar" onclick="renovarLinkColeta()" style="background:transparent; border:1.5px solid var(--border-color,#ccc); color:var(--text-primary); margin-top:6px;">🔄 Gerar link novo</button>
     </div>
 
@@ -397,7 +397,7 @@
       </div>
       <div id="coleta-status" class="alert alert-warn" style="display:none; margin-bottom:12px;"></div>
       <div class="thumb-grid" id="coleta-grid"></div>
-      <div id="coleta-vazio" style="text-align:center; color:#999; padding:26px 10px; font-size:14px;">Nenhuma foto recebida ainda.<br>Assim que o funcionário enviar, aparece aqui.</div>
+      <div id="coleta-vazio" style="text-align:center; color:#999; padding:26px 10px; font-size:14px;">Nenhuma foto recebida ainda.<br>Assim que o colaborador enviar, aparece aqui.</div>
     </div>
     <button class="btn btn-green" id="coleta-enviar-todas" onclick="enviarTodasColeta()" style="display:none;">📲 Enviar todas</button>
   </div>
@@ -620,7 +620,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.1.0';
+const APP_VERSION = '6.1.1';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2166,7 +2166,7 @@ async function fetchComTimeout(url, options, timeoutMs, mensagemTimeout) {
 }
 
 // ===================================================================
-// ===== COLETA DE FOTOS (fotos que o funcionario enviou pelo link) ===
+// ===== COLETA DE FOTOS (fotos que o colaborador enviou pelo link) ===
 // ===================================================================
 let coletaFotos = [];      // [{id, mimetype, criada_em}]
 let coletaEnviando = false;
@@ -2241,7 +2241,7 @@ function copiarLinkColeta(){
   const inp = document.getElementById('coleta-link');
   const v = inp.value;
   if(navigator.clipboard){
-    navigator.clipboard.writeText(v).then(()=>coletaStatus('✅ Link copiado! Mande pro seu funcionário.'),
+    navigator.clipboard.writeText(v).then(()=>coletaStatus('✅ Link copiado! Mande pro seu colaborador.'),
       ()=>{ inp.select(); coletaStatus('Selecione e copie o link.'); });
   } else { inp.select(); try{ document.execCommand('copy'); coletaStatus('✅ Link copiado!'); }catch(e){ coletaStatus('Selecione e copie o link.'); } }
 }
@@ -2254,7 +2254,7 @@ async function renovarLinkColeta(){
     const d = await r.json();
     if(r.ok && d.token){
       document.getElementById('coleta-link').value = `${COMPROV_BACKEND}/coleta/${d.token}`;
-      coletaStatus('✅ Link novo gerado. Passe o novo link pro funcionário.');
+      coletaStatus('✅ Link novo gerado. Passe o novo link pro colaborador.');
     } else coletaStatus('⚠️ Não consegui gerar o link novo.');
   } catch(e){ coletaStatus('⚠️ Erro de conexão.'); }
 }
