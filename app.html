@@ -380,7 +380,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.1.4</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.1.5</span></div>
 </div>
 
 <div class="container">
@@ -630,7 +630,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.1.4';
+const APP_VERSION = '6.1.5';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2300,7 +2300,7 @@ function copiarLinkColeta(){
 }
 
 async function renovarLinkColeta(){
-  if(!confirm('Gerar um link novo? O link antigo vai parar de funcionar na hora.')) return;
+  if(!(await confirmarCustomizadoAsync('Gerar um link novo? O link antigo vai parar de funcionar na hora.', '🔄'))) return;
   const codigo = localStorage.getItem('codigo_acesso');
   try {
     const r = await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/renovar-link`, { method:'POST' });
@@ -2378,7 +2378,7 @@ async function enviarTodasColeta(){
 }
 
 async function descartarFotoColeta(id){
-  if(!confirm('Descartar esta foto? Ela não será enviada.')) return;
+  if(!(await confirmarCustomizadoAsync('Descartar esta foto? Ela não será enviada.', '🗑️'))) return;
   const codigo = localStorage.getItem('codigo_acesso');
   try {
     await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/foto/${id}`, { method:'DELETE' });
