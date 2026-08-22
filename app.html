@@ -380,7 +380,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.1.3</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.1.4</span></div>
 </div>
 
 <div class="container">
@@ -630,7 +630,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.1.3';
+const APP_VERSION = '6.1.4';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2201,7 +2201,7 @@ function mostrarColetaToast(qtd){
   }
   const frase = qtd === 1 ? 'Chegou 1 foto nova na coleta!' : 'Chegaram ' + qtd + ' fotos novas na coleta!';
   t.innerHTML = '<span class="ct-ic">📥</span><span class="ct-txt">' + frase + '<small>Toque para ver e enviar</small></span>';
-  requestAnimationFrame(function(){ t.classList.add('mostra'); });
+  setTimeout(function(){ t.classList.add('mostra'); }, 40);
   clearTimeout(coletaToastTimer);
   coletaToastTimer = setTimeout(esconderColetaToast, 7000);
 }
