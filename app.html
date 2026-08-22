@@ -370,7 +370,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.1.1</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.1.2</span></div>
 </div>
 
 <div class="container">
@@ -393,7 +393,7 @@
     <div class="card">
       <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
         <span id="coleta-fotos-tit">📷 Fotos recebidas</span>
-        <button onclick="carregarColeta()" style="background:transparent; border:none; color:var(--cor-loja,#3a3f44); font-size:13px; font-weight:700; cursor:pointer;">Atualizar</button>
+        <button onclick="carregarColeta()" style="background:transparent; border:none; color:var(--text-primary); font-size:13px; font-weight:700; cursor:pointer;">Atualizar</button>
       </div>
       <div id="coleta-status" class="alert alert-warn" style="display:none; margin-bottom:12px;"></div>
       <div class="thumb-grid" id="coleta-grid"></div>
@@ -620,7 +620,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.1.1';
+const APP_VERSION = '6.1.2';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
