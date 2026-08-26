@@ -1244,15 +1244,28 @@ function abrirFotoResultado(i) {
     let pinchAtivo = false, pinchDist = 0, pinchBase = 1;
     function limites(){ const r = area.getBoundingClientRect(); tx = Math.min(0, Math.max(-r.width*(escala-1), tx)); ty = Math.min(0, Math.max(-r.height*(escala-1), ty)); }
     function aplicar(){ limites(); img.style.transform = 'translate('+tx+'px,'+ty+'px) scale('+escala+')'; }
-    function ampliarNoPonto(fx, fy, novaEscala){ const r = area.getBoundingClientRect(); escala = novaEscala; tx = -(r.width*fx)*(escala-1); ty = -(r.height*fy)*(escala-1); aplicar(); }
-    overlay.querySelector('#rec-zmais').addEventListener('click', (e)=>{ e.stopPropagation(); const nova = Math.min(4, escala+0.7); if(escala<=1) ampliarNoPonto(0.5, 0.42, nova); else { escala = nova; aplicar(); } });
-    overlay.querySelector('#rec-zmenos').addEventListener('click', (e)=>{ e.stopPropagation(); escala = Math.max(1, escala-0.7); if(escala===1){ tx=0; ty=0; } aplicar(); });
+    // Muda o zoom mantendo FIXO o ponto (fx, fy) em pixels de tela (relativos à área).
+    // Sem fx/fy, usa o CENTRO da área — assim o zoom "cresce do meio", nao vai pro lado.
+    function zoomPara(novaEscala, fx, fy){
+      const r = area.getBoundingClientRect();
+      if (fx == null) fx = r.width/2;
+      if (fy == null) fy = r.height/2;
+      const e1 = Math.min(4, Math.max(1, novaEscala));
+      tx = fx - (fx - tx) * (e1/escala);
+      ty = fy - (fy - ty) * (e1/escala);
+      escala = e1;
+      if (escala === 1) { tx = 0; ty = 0; }
+      aplicar();
+    }
+    overlay.querySelector('#rec-zmais').addEventListener('click', (e)=>{ e.stopPropagation(); zoomPara(escala + 0.7); });
+    overlay.querySelector('#rec-zmenos').addEventListener('click', (e)=>{ e.stopPropagation(); zoomPara(escala - 0.7); });
     area.addEventListener('pointerdown', (e)=>{
       const agora = Date.now();
+      const r = area.getBoundingClientRect();
       if (agora - ultimoTap < 300 && !pinchAtivo) {
-        const r = area.getBoundingClientRect();
-        if (escala > 1) { escala = 1; tx = 0; ty = 0; aplicar(); }
-        else ampliarNoPonto((e.clientX-r.left)/r.width, (e.clientY-r.top)/r.height, 2.6);
+        if (escala > 1) zoomPara(1);
+        else zoomPara(2.6, e.clientX - r.left, e.clientY - r.top);
+        ultimoTap = 0; return;
       }
       ultimoTap = agora;
       if (escala <= 1 || pinchAtivo) return;
@@ -1263,7 +1276,7 @@ function abrirFotoResultado(i) {
     area.addEventListener('pointerup', ()=>{ arrastando = false; });
     function dist(t){ return Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY); }
     area.addEventListener('touchstart', (e)=>{ if(e.touches.length===2){ pinchAtivo=true; arrastando=false; pinchDist=dist(e.touches); pinchBase=escala; } }, {passive:true});
-    area.addEventListener('touchmove', (e)=>{ if(e.touches.length===2 && pinchDist){ e.preventDefault(); escala = Math.min(4, Math.max(1, pinchBase * dist(e.touches)/pinchDist)); if(escala===1){ tx=0; ty=0; } aplicar(); } }, {passive:false});
+    area.addEventListener('touchmove', (e)=>{ if(e.touches.length===2 && pinchDist){ e.preventDefault(); const r = area.getBoundingClientRect(); const cx = (e.touches[0].clientX+e.touches[1].clientX)/2 - r.left; const cy = (e.touches[0].clientY+e.touches[1].clientY)/2 - r.top; zoomPara(pinchBase * dist(e.touches)/pinchDist, cx, cy); } }, {passive:false});
     area.addEventListener('touchend', (e)=>{ if(e.touches.length<2) pinchAtivo=false; });
   }
 
