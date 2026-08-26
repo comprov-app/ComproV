@@ -206,6 +206,17 @@
     flex-shrink:0; white-space:nowrap;
   }
   .foto-rec-btn:disabled { opacity:.6; }
+  /* Tela de reenvio: foto com zoom em cima, campo fixo embaixo (não pula com o teclado) */
+  .foto-fullscreen-overlay.reenvio { flex-direction:column; align-items:stretch; justify-content:flex-start; padding:0; overflow:hidden; }
+  .reenvio .rec-header { flex:0 0 auto; display:flex; align-items:center; gap:10px; padding:12px 14px 8px; }
+  .reenvio .rec-header .foto-fullscreen-fechar { position:static; top:auto; right:auto; width:34px; height:34px; flex:0 0 auto; }
+  .reenvio .rec-instr { font-size:12.5px; color:#e6e6e0; font-weight:600; line-height:1.35; }
+  .reenvio .rec-instr b { color:#25D366; }
+  .rec-foto-area { flex:1 1 auto; min-height:0; overflow:hidden; position:relative; background:#111; touch-action:none; }
+  .rec-foto-img { width:100%; height:100%; object-fit:contain; transform-origin:0 0; will-change:transform; -webkit-user-drag:none; user-select:none; }
+  .rec-zoom-ctrl { position:absolute; right:10px; bottom:10px; display:flex; flex-direction:column; gap:7px; z-index:5; }
+  .rec-zoom-ctrl button { width:40px; height:40px; border-radius:11px; border:none; background:rgba(0,0,0,.55); color:#fff; font-size:22px; font-weight:700; cursor:pointer; line-height:1; }
+  .reenvio .foto-rec-box { flex:0 0 auto; margin:0; width:100%; max-width:none; padding:11px 13px calc(11px + env(safe-area-inset-bottom)); background:#141414; border-top:1px solid rgba(255,255,255,.08); gap:8px; }
   .summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
   .summary-box { background: var(--summary-bg); border-radius:10px; padding:12px 8px; text-align:center; }
   .summary-box .num { font-size:22px; font-weight:700; }
@@ -1171,32 +1182,92 @@ function abrirFotoResultado(i) {
     return;
   }
 
-  // Pros itens que falharam, mostra o campo de telefone + enviar embaixo da foto.
-  // Assim o lojista le o numero na etiqueta ampliada e digita olhando pra ela.
+  // Se o envio falhou, abre a tela de RECUPERAÇÃO: foto grande com zoom (pra ler o
+  // telefone na etiqueta) em cima, e o campo de telefone FIXO embaixo. Assim a foto
+  // não pula quando o teclado abre e o campo nunca fica escondido.
   const podeRecuperar = !item.sucesso && !item.duplicado;
-  const recuperarHtml = podeRecuperar
-    ? `<div class="foto-rec-box">
-         <input type="tel" class="foto-rec-tel" id="foto-rec-tel" inputmode="numeric"
-                placeholder="(00) 00000-0000" value="${escHtml(item.telefone||'')}" />
-         <button class="foto-rec-btn" id="foto-rec-enviar">Enviar</button>
-       </div>`
-    : '';
 
   const overlay = document.createElement('div');
-  overlay.className = 'foto-fullscreen-overlay';
-  overlay.innerHTML = `
-    <button class="foto-fullscreen-fechar" id="foto-res-fechar">✕</button>
-    <img src="${item.previewUrl}" class="foto-fullscreen-img" />
-    ${recuperarHtml}
-  `;
+  overlay.className = 'foto-fullscreen-overlay' + (podeRecuperar ? ' reenvio' : '');
+
+  if (podeRecuperar) {
+    overlay.innerHTML = `
+      <div class="rec-header">
+        <button class="foto-fullscreen-fechar" id="foto-res-fechar">✕</button>
+        <div class="rec-instr">👆 Dê zoom, leia o telefone na foto e digite <b>aqui embaixo</b></div>
+      </div>
+      <div class="rec-foto-area" id="rec-foto-area">
+        <img src="${item.previewUrl}" class="rec-foto-img" id="rec-foto-img" />
+        <div class="rec-zoom-ctrl">
+          <button id="rec-zmais" type="button">+</button>
+          <button id="rec-zmenos" type="button">−</button>
+        </div>
+      </div>
+      <div class="foto-rec-box">
+        <input type="tel" class="foto-rec-tel" id="foto-rec-tel" inputmode="numeric"
+               placeholder="(00) 00000-0000" value="${escHtml(item.telefone||'')}" />
+        <button class="foto-rec-btn" id="foto-rec-enviar">Enviar</button>
+      </div>`;
+  } else {
+    overlay.innerHTML = `
+      <button class="foto-fullscreen-fechar" id="foto-res-fechar">✕</button>
+      <img src="${item.previewUrl}" class="foto-fullscreen-img" />`;
+  }
   document.body.appendChild(overlay);
 
-  function fechar() { overlay.remove(); }
-  overlay.querySelector('#foto-res-fechar').addEventListener('click', fechar);
-  // Fecha ao tocar no fundo escuro — mas SO no fundo, nunca na imagem/campo/botao
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(); });
+  // Ajusta a altura da tela ao teclado (iOS/Android): encolhe pra a área visível,
+  // deixando o campo sempre logo acima do teclado, sem a foto pular.
+  let vvHandler = null;
+  if (podeRecuperar && window.visualViewport) {
+    const vv = window.visualViewport;
+    vvHandler = () => { overlay.style.height = vv.height + 'px'; };
+    vv.addEventListener('resize', vvHandler);
+    vvHandler();
+  }
 
-  // Botao de enviar dentro da foto ampliada
+  function fechar() {
+    if (vvHandler && window.visualViewport) window.visualViewport.removeEventListener('resize', vvHandler);
+    overlay.remove();
+  }
+  overlay.querySelector('#foto-res-fechar').addEventListener('click', fechar);
+  // Só na tela de "ver foto" (sem reenvio) o toque no fundo fecha. Na de reenvio,
+  // o fundo é a foto/campo — fecha só pelo X, pra não fechar sem querer ao dar zoom.
+  if (!podeRecuperar) {
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(); });
+  }
+
+  // ===== Zoom e arraste na foto (só na tela de reenvio) =====
+  if (podeRecuperar) {
+    const area = overlay.querySelector('#rec-foto-area');
+    const img = overlay.querySelector('#rec-foto-img');
+    let escala = 1, tx = 0, ty = 0, arrastando = false, sx = 0, sy = 0, ultimoTap = 0;
+    let pinchAtivo = false, pinchDist = 0, pinchBase = 1;
+    function limites(){ const r = area.getBoundingClientRect(); tx = Math.min(0, Math.max(-r.width*(escala-1), tx)); ty = Math.min(0, Math.max(-r.height*(escala-1), ty)); }
+    function aplicar(){ limites(); img.style.transform = 'translate('+tx+'px,'+ty+'px) scale('+escala+')'; }
+    function ampliarNoPonto(fx, fy, novaEscala){ const r = area.getBoundingClientRect(); escala = novaEscala; tx = -(r.width*fx)*(escala-1); ty = -(r.height*fy)*(escala-1); aplicar(); }
+    overlay.querySelector('#rec-zmais').addEventListener('click', (e)=>{ e.stopPropagation(); const nova = Math.min(4, escala+0.7); if(escala<=1) ampliarNoPonto(0.5, 0.42, nova); else { escala = nova; aplicar(); } });
+    overlay.querySelector('#rec-zmenos').addEventListener('click', (e)=>{ e.stopPropagation(); escala = Math.max(1, escala-0.7); if(escala===1){ tx=0; ty=0; } aplicar(); });
+    area.addEventListener('pointerdown', (e)=>{
+      const agora = Date.now();
+      if (agora - ultimoTap < 300 && !pinchAtivo) {
+        const r = area.getBoundingClientRect();
+        if (escala > 1) { escala = 1; tx = 0; ty = 0; aplicar(); }
+        else ampliarNoPonto((e.clientX-r.left)/r.width, (e.clientY-r.top)/r.height, 2.6);
+      }
+      ultimoTap = agora;
+      if (escala <= 1 || pinchAtivo) return;
+      arrastando = true; sx = e.clientX - tx; sy = e.clientY - ty;
+      try { area.setPointerCapture(e.pointerId); } catch(err){}
+    });
+    area.addEventListener('pointermove', (e)=>{ if(!arrastando) return; tx = e.clientX - sx; ty = e.clientY - sy; aplicar(); });
+    area.addEventListener('pointerup', ()=>{ arrastando = false; });
+    function dist(t){ return Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY); }
+    area.addEventListener('touchstart', (e)=>{ if(e.touches.length===2){ pinchAtivo=true; arrastando=false; pinchDist=dist(e.touches); pinchBase=escala; } }, {passive:true});
+    area.addEventListener('touchmove', (e)=>{ if(e.touches.length===2 && pinchDist){ e.preventDefault(); escala = Math.min(4, Math.max(1, pinchBase * dist(e.touches)/pinchDist)); if(escala===1){ tx=0; ty=0; } aplicar(); } }, {passive:false});
+    area.addEventListener('touchend', (e)=>{ if(e.touches.length<2) pinchAtivo=false; });
+  }
+
+  // Campo de enviar dentro da foto ampliada
   const btnEnviar = overlay.querySelector('#foto-rec-enviar');
   const input = overlay.querySelector('#foto-rec-tel');
   if (btnEnviar && input) {
