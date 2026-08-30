@@ -391,7 +391,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.1.8</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.1.9</span></div>
 </div>
 
 <div class="container">
@@ -641,7 +641,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.1.5';
+const APP_VERSION = '6.1.9';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -1530,7 +1530,7 @@ function gerarMiniaturaFila(file, index, itemRef) {
 // rolar de volta pro fim, o acompanhamento VOLTA a funcionar automaticamente.
 let autoScrollLigado = true;      // começa acompanhando
 let processandoEnvios = false;    // true enquanto o lote está sendo enviado
-let ignorarProximoScroll = false; // evita que o scroll automático desligue a si mesmo
+let scrollAutoAte = 0;            // enquanto Date.now() < isto, os eventos de scroll são do nosso próprio movimento suave (não do usuário)
 
 // Detecta se o usuário está perto do fim da página (tolerância generosa de 250px).
 function estaPertoDoFim() {
@@ -1544,8 +1544,10 @@ function estaPertoDoFim() {
 // - Voltou pro fim -> religa o acompanhamento
 function aoRolarTela() {
   if (!processandoEnvios) return;
-  // Se este evento veio do nosso próprio scroll automático, ignora (não desliga)
-  if (ignorarProximoScroll) { ignorarProximoScroll = false; return; }
+  // A rolagem suave dispara VÁRIOS eventos de scroll durante a animação. Ignoramos
+  // TODOS por uma janelinha de tempo depois do nosso próprio movimento — senão o
+  // acompanhamento se desligava sozinho no meio da animação (parava de seguir).
+  if (Date.now() < scrollAutoAte) return;
   autoScrollLigado = estaPertoDoFim();
 }
 
@@ -1554,7 +1556,7 @@ function acompanharItem(i) {
   if (!autoScrollLigado) return;
   const linha = document.getElementById('item-row-' + i);
   if (!linha) return;
-  ignorarProximoScroll = true;
+  scrollAutoAte = Date.now() + 1000; // ignora os eventos de scroll pelo próximo 1s (duração da animação)
   // Rola a janela até deixar o item visível, um pouco acima do rodapé
   const rect = linha.getBoundingClientRect();
   const alvo = window.scrollY + rect.top - (window.innerHeight * 0.4);
