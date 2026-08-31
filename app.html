@@ -100,6 +100,10 @@
   .taxa-atalho.ativo { border-color: #2ecc71; background: #2ecc71; color: #fff; }
   .btn-red { background: #dc3545; color: #fff; }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-whats { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:13px; border-radius:10px; background:#25D366; color:#04240f; font-weight:700; font-size:15px; text-decoration:none; margin-top:14px; transition:opacity .15s; }
+  .btn-whats:active { opacity:.85; }
+  .btn-whats svg { width:20px; height:20px; }
+  .whats-ajuda { text-align:center; margin-top:20px; font-size:13px; color: var(--text-secondary, #888); }
   .upload-area { border: 2px dashed #c8e6d8; border-radius: 12px; padding: 28px 16px; text-align: center; cursor: pointer; background: #f0faf6; transition: border-color .2s, background .2s; }
   .upload-area:hover { border-color: var(--cor-loja, #3a3f44); }
   .upload-area.drag-ativo { border-color: var(--cor-loja, #3a3f44); background: #e2f5ec; border-style: solid; }
@@ -391,7 +395,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.1.9</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.2.0</span></div>
 </div>
 
 <div class="container">
@@ -440,6 +444,13 @@
         <div id="codigo-status" style="margin-top:10px; font-size:14px;"></div>
       </div>
       <button class="btn btn-green" id="btn-ativar" onclick="ativarPorCodigo()">🔓 Ativar</button>
+
+      <!-- Contato WhatsApp: ajuda o cliente atual e quem ainda não tem código -->
+      <div class="whats-ajuda">Precisa de ajuda ou ainda não tem um código?</div>
+      <a class="btn-whats" href="https://wa.me/5581997179441?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20ComproV." target="_blank" rel="noopener">
+        <svg viewBox="0 0 32 32" fill="currentColor"><path d="M16.003 3C9.38 3 4 8.377 4 15c0 2.117.553 4.104 1.523 5.83L4 29l8.36-1.49A11.94 11.94 0 0016.003 27C22.626 27 28 21.623 28 15S22.626 3 16.003 3zm0 21.82a9.8 9.8 0 01-4.995-1.365l-.358-.213-3.72.663.663-3.63-.233-.372A9.77 9.77 0 016.2 15c0-5.404 4.398-9.8 9.803-9.8 5.404 0 9.797 4.396 9.797 9.8 0 5.404-4.393 9.82-9.797 9.82zm5.373-7.34c-.294-.147-1.74-.86-2.01-.957-.27-.098-.466-.147-.663.147-.196.294-.76.957-.932 1.153-.172.196-.343.22-.637.073-.294-.147-1.242-.458-2.366-1.46-.874-.78-1.464-1.744-1.636-2.038-.172-.294-.018-.453.13-.6.133-.132.294-.343.44-.515.148-.172.196-.294.295-.49.098-.196.05-.368-.025-.515-.073-.147-.663-1.598-.908-2.188-.24-.575-.483-.497-.663-.506l-.565-.01c-.196 0-.515.073-.785.368-.27.294-1.03 1.006-1.03 2.454s1.054 2.847 1.2 3.043c.147.196 2.075 3.17 5.03 4.444.703.303 1.25.484 1.678.62.705.224 1.346.192 1.853.116.565-.084 1.74-.71 1.985-1.397.245-.686.245-1.274.172-1.397-.073-.123-.27-.196-.565-.343z"/></svg>
+        Falar no WhatsApp
+      </a>
       <!-- Campos ocultos: o código preenche eles automaticamente (mantém o resto do app funcionando igual) -->
       <input type="hidden" id="evo-server" />
       <input type="hidden" id="evo-instance" />
@@ -641,7 +652,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.1.9';
+const APP_VERSION = '6.2.0';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
