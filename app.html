@@ -104,20 +104,6 @@
   .btn-whats:active { opacity:.85; }
   .btn-whats svg { width:20px; height:20px; }
   .whats-ajuda { text-align:center; margin-top:20px; font-size:13px; color: var(--text-secondary, #888); }
-  /* Envio pelo servidor (segundo plano) */
-  .btn-fila { background: transparent; border: 2px solid var(--cor-loja,#3a3f44); color: var(--text-primary); }
-  .dica-fila { font-size:12px; color: var(--text-secondary,#888); text-align:center; margin-top:8px; line-height:1.4; }
-  .fila-ok { background: var(--verde-tint,#e9f9f0); color: var(--verde-escuro,#128C4B); padding:12px; border-radius:10px; font-size:14px; font-weight:600; line-height:1.4; }
-  .fila-nums { display:flex; justify-content:space-between; gap:8px; margin-top:14px; font-size:13.5px; flex-wrap:wrap; }
-  .fila-nums b { font-size:15px; }
-  .fila-item { padding:10px 4px; border-bottom:1px solid var(--border-color,#eee); }
-  .fila-item:last-child { border-bottom:none; }
-  .fi-linha { display:flex; align-items:center; gap:10px; }
-  .fi-info { flex:1; min-width:0; }
-  .fi-nome { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .fi-det { font-size:12px; color:var(--text-secondary,#888); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .fi-corrigir { display:flex; gap:6px; margin-top:8px; }
-  .fi-corrigir input { flex:1; min-width:0; padding:9px; border:1px solid var(--border-color,#ddd); border-radius:8px; font-size:14px; }
   .upload-area { border: 2px dashed #c8e6d8; border-radius: 12px; padding: 28px 16px; text-align: center; cursor: pointer; background: #f0faf6; transition: border-color .2s, background .2s; }
   .upload-area:hover { border-color: var(--cor-loja, #3a3f44); }
   .upload-area.drag-ativo { border-color: var(--cor-loja, #3a3f44); background: #e2f5ec; border-style: solid; }
@@ -409,7 +395,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.0</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.1</span></div>
 </div>
 
 <div class="container">
@@ -575,35 +561,7 @@
       <div class="thumb-grid" id="thumb-grid"></div>
       <div class="alert alert-warn" id="aviso-intervalo" style="display:none; margin-top:12px;"></div>
     </div>
-    <button class="btn btn-green" id="btn-send" onclick="enviarPeloServidor()" disabled>📲 Ler e enviar comprovantes</button>
-    <div class="dica-fila">Pode <b>minimizar ou abrir outro app</b> durante o envio — o ComproV continua enviando sozinho, no ritmo certo. 💚</div>
-  </div>
-
-  <!-- ========== FILA NO SERVIDOR (segundo plano) ========== -->
-  <div class="section" id="sec-fila">
-    <div class="card" id="fila-subindo" style="display:none;">
-      <div class="card-title">📤 Preparando o envio...</div>
-      <div class="progress-bar"><div class="progress-fill" id="fila-up-fill" style="width:0%"></div></div>
-      <div class="progress-label"><span id="fila-up-text">Preparando...</span><span id="fila-up-pct">0%</span></div>
-      <p style="font-size:13px;color:var(--text-secondary,#888);margin-top:8px;">Segure o app aberto só um instante. Depois pode minimizar à vontade.</p>
-    </div>
-
-    <div class="card" id="fila-painel" style="display:none;">
-      <div class="fila-ok">✅ Pronto! Pode <b>minimizar ou abrir outro app</b> — o ComproV continua enviando sozinho, no ritmo certo. A lista desce acompanhando; quando você voltar, ela pula pro ponto atual.</div>
-      <div class="progress-bar" style="margin-top:14px;"><div class="progress-fill" id="fila-prog-fill" style="width:0%"></div></div>
-      <div class="fila-nums" id="fila-nums">
-        <span>✅ Enviados: <b id="fila-n-enviados">0</b></span>
-        <span>⏳ Faltam: <b id="fila-n-fila">0</b></span>
-        <span>⚠️ Falharam: <b id="fila-n-falhou">0</b></span>
-      </div>
-    </div>
-
-    <div class="card" id="fila-lista-card" style="display:none;">
-      <div class="card-title">📋 Comprovantes</div>
-      <div id="fila-lista"></div>
-    </div>
-
-    <button class="btn btn-gray" onclick="voltarDaFila()" style="margin-top:12px;">← Voltar</button>
+    <button class="btn btn-green" id="btn-send" onclick="startProcessingServidor()" disabled>📲 Ler e enviar comprovantes</button>
   </div>
 
   <!-- ========== PROCESSANDO ========== -->
@@ -694,7 +652,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.0';
+const APP_VERSION = '6.3.1';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -1086,7 +1044,6 @@ function onFilesSelected(files) {
   selectedFiles = Array.from(files);
   renderThumbGrid();
   document.getElementById('btn-send').disabled = selectedFiles.length === 0;
-  { const _bss = document.getElementById('btn-send-servidor'); if (_bss) _bss.disabled = selectedFiles.length === 0; }
   atualizarAvisoIntervalo();
 }
 
@@ -1125,7 +1082,6 @@ function onFilesSelected(files) {
     selectedFiles = selectedFiles.concat(arquivosSoltos);
     renderThumbGrid();
     document.getElementById('btn-send').disabled = selectedFiles.length === 0;
-  { const _bss = document.getElementById('btn-send-servidor'); if (_bss) _bss.disabled = selectedFiles.length === 0; }
     atualizarAvisoIntervalo();
   });
 })();
@@ -1500,7 +1456,6 @@ function removerFoto(i) {
   selectedFiles.splice(i, 1);
   renderThumbGrid();
   document.getElementById('btn-send').disabled = selectedFiles.length === 0;
-  { const _bss = document.getElementById('btn-send-servidor'); if (_bss) _bss.disabled = selectedFiles.length === 0; }
   atualizarAvisoIntervalo();
 }
 
@@ -1667,6 +1622,8 @@ document.addEventListener('visibilitychange', () => {
 let loteEmAndamento = false;
 
 function mostrarAvisoSegundoPlano() {
+  // No envio pelo servidor NAO pausa em segundo plano — nao mostra o aviso antigo.
+  if (window.envioNoServidor) return;
   const banner = document.getElementById('aviso-segundo-plano');
   if (banner) banner.style.display = 'block';
 }
@@ -2284,6 +2241,151 @@ async function startProcessing() {
   showDone(ok, err);
 }
 
+// ===== ENVIO PELO SERVIDOR (mesma tela de sempre; o servidor envia) =====
+// Igual a experiencia antiga (mesma tela de envio, mesma tela de foto com zoom na
+// falha, tela que nao apaga), mas em vez do celular enviar um a um — o que PAUSA
+// quando o navegador vai pra segundo plano — o app SOBE as fotos pra fila e o
+// servidor envia sozinho, no ritmo certo. A tela vai marcando pelo status da fila,
+// entao pode minimizar/abrir outro app que continua.
+async function startProcessingServidor() {
+  const codigoAcesso = localStorage.getItem('codigo_acesso');
+  const evoServer   = localStorage.getItem('evo_server');
+  const evoInstance = localStorage.getItem('evo_instance');
+  if (!codigoAcesso || !evoServer || !evoInstance) {
+    mostrarAvisoCustomizado('Ative sua loja no Painel antes de enviar.', '⚠️');
+    return;
+  }
+  const sync = await sincronizarConfig();
+  if (!sync.ok) {
+    if (sync.motivo === 'inativo') mostrarAvisoCustomizado('Sua assinatura esta inativa. Entre em contato para reativar.', '🚫');
+    else if (sync.motivo === 'naoexiste') mostrarAvisoCustomizado('Codigo de acesso invalido. Ative sua loja novamente no Painel.', '🔑');
+    else mostrarAvisoCustomizado('Nao foi possivel verificar sua assinatura. Tente novamente.', '⚠️');
+    return;
+  }
+  if (!limiteJaFoiDefinido()) {
+    mostrarAvisoCustomizado('Sua loja ainda não foi ativada. Digite seu código de acesso no Painel.', '🔑');
+    setSection('sec-painel');
+    const btnApis = document.getElementById('btn-tab-apis');
+    if (btnApis) showTab('tab-apis', btnApis);
+    return;
+  }
+  const limiteMensal = obterLimiteMensal();
+  if (limiteMensal) {
+    const restante = limiteMensal - obterUsoMensal();
+    if (restante <= 0) { mostrarAvisoCustomizado('Limite mensal de comprovantes já foi atingido!', '🚫'); return; }
+    if (selectedFiles.length > restante) {
+      const continuar = await confirmarCustomizadoAsync(`Esse lote tem ${selectedFiles.length} fotos, mas restam apenas ${restante} envios disponíveis neste mês (limite de ${limiteMensal}).<br><br>Deseja continuar mesmo assim? O envio vai parar automaticamente ao atingir o limite.`, '⚠️');
+      if (!continuar) return;
+    }
+  }
+
+  dadosLidos = new Array(selectedFiles.length);
+  const items = selectedFiles.map(f => ({ file:f, previewUrl: URL.createObjectURL(f) }));
+  setSection('sec-processing');
+  renderItems(items);
+
+  loteEmAndamento = true;
+  window.envioNoServidor = true;   // o servidor envia — nao mostrar o aviso de "pode pausar"
+  await pedirWakeLock();
+  processandoEnvios = true;
+  autoScrollLigado = true;
+
+  const inicioLote = Date.now();
+  const codigo = codigoAcesso;
+  const cfgMsg = {
+    template: localStorage.getItem('msg_template') || MSG_PADRAO,
+    template_taxa: MSG_TAXA,
+    pix_chave: localStorage.getItem('pix_chave') || '(configure no Painel)',
+    pix_nome:  localStorage.getItem('pix_nome')  || '(configure no Painel)',
+    pix_banco: localStorage.getItem('pix_banco') || '(configure no Painel)',
+  };
+  if (localStorage.getItem('taxa_todos_ativa') === '1') {
+    const v = (localStorage.getItem('taxa_todos_valor') || '').trim();
+    if (v) cfgMsg.taxa_todos = v;
+  }
+  const intervaloManual = localStorage.getItem('intervalo_envio');
+  const segundosIntervalo = (intervaloManual && intervaloManual !== 'auto')
+    ? parseInt(intervaloManual, 10) : calcularIntervaloRecomendado(selectedFiles.length);
+
+  // Limpa concluidos de lotes anteriores (a lista mostra so o lote atual)
+  try { await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/limpar`, { method:'POST' }); } catch(e){}
+
+  let ok = 0, err = 0;
+  const filaIds = new Array(selectedFiles.length).fill(null);
+  const hashPorIndice = new Array(selectedFiles.length).fill(null);
+  const progText = document.getElementById('prog-text');
+
+  // ===== SOBE cada foto pra fila (o servidor comeca a enviar assim que chega) =====
+  for (let i = 0; i < selectedFiles.length; i++) {
+    if (progText) progText.textContent = `Preparando ${i + 1} de ${selectedFiles.length}...`;
+    const hash = await calcularHashArquivo(selectedFiles[i]);
+    hashPorIndice[i] = hash;
+    if (jaFoiEnviadoAntes(hash)) {
+      updateItem(i, selectedFiles[i].name, 'Esta foto já foi enviada anteriormente.', 'Duplicada', 'badge-err');
+      dadosLidos[i] = { nome:selectedFiles[i].name, file:selectedFiles[i], sucesso:false, duplicado:true, previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, erro:'Esta foto já foi enviada anteriormente.' };
+      err++; continue;
+    }
+    updateItem(i, selectedFiles[i].name, 'Na fila...', 'Na fila', 'badge-wait');
+    try {
+      const b64 = await toBase64(selectedFiles[i]);
+      const r = await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/adicionar`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ imagem_base64:b64, mimetype:'image/jpeg', intervalo_seg:segundosIntervalo, msg_config:cfgMsg })
+      });
+      if (!r.ok) throw new Error('nao subiu');
+      const j = await r.json();
+      filaIds[i] = j.id;
+    } catch(e) {
+      updateItem(i, selectedFiles[i].name, 'Não foi possível preparar esta foto. Tente de novo.', 'Erro', 'badge-err');
+      dadosLidos[i] = { nome:selectedFiles[i].name, file:selectedFiles[i], sucesso:false, previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, erro:'Não foi possível preparar esta foto.' };
+      err++;
+    }
+  }
+
+  // ===== ACOMPANHA a fila: o servidor envia e a tela vai marcando (igual antes) =====
+  await new Promise((resolve) => {
+    async function checar() {
+      let d = null;
+      try { const r = await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/status?t=${Date.now()}`); if (r.ok) d = await r.json(); } catch(e){}
+      if (d && d.itens) {
+        const mapa = {}; d.itens.forEach(it => { mapa[it.id] = it; });
+        let terminados = 0;
+        for (let i = 0; i < selectedFiles.length; i++) {
+          if (dadosLidos[i]) { terminados++; continue; }
+          const it = filaIds[i] != null ? mapa[filaIds[i]] : null;
+          if (!it) continue;
+          if (it.status === 'enviado') {
+            updateItem(i, it.nome || selectedFiles[i].name, `${it.telefone || ''} · ✓ Enviado`, 'Enviado', 'badge-ok');
+            dadosLidos[i] = { ...(it.dados || {}), nome: it.nome, telefone: it.telefone, file:selectedFiles[i], previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, sucesso:true };
+            if (hashPorIndice[i]) registrarHashEnviado(hashPorIndice[i]);
+            ok++; terminados++;
+          } else if (it.status === 'falhou') {
+            updateItem(i, it.nome || selectedFiles[i].name, it.erro || 'Falhou', 'Erro', 'badge-err');
+            dadosLidos[i] = { ...(it.dados || {}), nome: it.nome || selectedFiles[i].name, telefone: it.telefone, file:selectedFiles[i], previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, sucesso:false, erro: it.erro };
+            err++; terminados++;
+          } else if (it.status === 'processando') {
+            updateItem(i, it.nome || selectedFiles[i].name, 'Enviando...', 'Enviando', 'badge-proc');
+          }
+        }
+        updateProgress(terminados, selectedFiles.length);
+        if (terminados >= selectedFiles.length) { resolve(); return; }
+      }
+      setTimeout(checar, 3000);
+    }
+    checar();
+  });
+
+  loteEmAndamento = false;
+  window.envioNoServidor = false;
+  liberarWakeLock();
+  processandoEnvios = false;
+  limparProgressoLote();
+
+  await sleep(400);
+  salvarHistorico(inicioLote, ok, err);
+  showDone(ok, err);
+}
+
 function contagemRegressiva(ms) {
   return new Promise((resolve) => {
     const segundosTotais = Math.ceil(ms / 1000);
@@ -2673,213 +2775,6 @@ function montarMensagem(dados) {
     .replace(/{pix_banco}/g, pixBanco);
 }
 
-// ===== ENVIO PELO SERVIDOR (segundo plano) =====
-// O app so SOBE as fotos pra fila; quem le e envia (no ritmo certo) e o servidor.
-// Assim o lojista pode minimizar/fechar o navegador que o envio continua.
-let filaPollTimer = null;
-
-function montarMsgConfigFila() {
-  const cfg = {
-    template: localStorage.getItem('msg_template') || MSG_PADRAO,
-    template_taxa: MSG_TAXA,
-    pix_chave: localStorage.getItem('pix_chave') || '(configure no Painel)',
-    pix_nome:  localStorage.getItem('pix_nome')  || '(configure no Painel)',
-    pix_banco: localStorage.getItem('pix_banco') || '(configure no Painel)',
-  };
-  // "cobrar taxa de todos": manda o valor pra fila aplicar em todo o lote
-  if (localStorage.getItem('taxa_todos_ativa') === '1') {
-    const v = (localStorage.getItem('taxa_todos_valor') || '').trim();
-    if (v) cfg.taxa_todos = v;
-  }
-  return cfg;
-}
-
-async function enviarPeloServidor() {
-  if (!selectedFiles.length) return;
-  const codigo = localStorage.getItem('codigo_acesso');
-  if (!codigo) { mostrarAvisoCustomizado('Ative sua loja primeiro (código de acesso no Painel).', '🔑'); return; }
-
-  const cfg = montarMsgConfigFila();
-  const intervalo = calcularIntervaloRecomendado(selectedFiles.length);
-  const arquivos = selectedFiles.slice();
-  const total = arquivos.length;
-
-  setSection('sec-fila');
-  document.getElementById('fila-subindo').style.display = 'block';
-  document.getElementById('fila-painel').style.display = 'none';
-  document.getElementById('fila-lista-card').style.display = 'none';
-  document.getElementById('fila-lista').innerHTML = '';
-  filaRowsStatus = {}; filaSeguir = true;
-
-  let subiu = 0, erroUp = 0;
-  for (let i = 0; i < total; i++) {
-    const pct = Math.round(i / total * 100);
-    document.getElementById('fila-up-text').textContent = `Preparando ${i + 1} de ${total}...`;
-    document.getElementById('fila-up-fill').style.width = pct + '%';
-    document.getElementById('fila-up-pct').textContent = pct + '%';
-    try {
-      const b64 = await toBase64(arquivos[i]);
-      const r = await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/adicionar`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imagem_base64: b64, mimetype: 'image/jpeg', intervalo_seg: intervalo, msg_config: cfg })
-      });
-      if (r.ok) subiu++; else erroUp++;
-    } catch (e) { erroUp++; }
-  }
-  document.getElementById('fila-up-fill').style.width = '100%';
-  document.getElementById('fila-up-pct').textContent = '100%';
-
-  // as fotos ja estao na fila do servidor — limpa a selecao local
-  selectedFiles = [];
-  const fi = document.getElementById('file-input'); if (fi) fi.value = '';
-  renderThumbGrid();
-  document.getElementById('btn-send').disabled = true;
-  { const _bss = document.getElementById('btn-send-servidor'); if (_bss) _bss.disabled = true; }
-
-  document.getElementById('fila-subindo').style.display = 'none';
-  document.getElementById('fila-painel').style.display = 'block';
-  document.getElementById('fila-lista-card').style.display = 'block';
-  if (subiu === 0) {
-    mostrarAvisoCustomizado('Nenhuma foto foi enviada. Confira sua conexão e se a assinatura está ativa.', '⚠️');
-  } else if (erroUp) {
-    mostrarAvisoCustomizado(`${subiu} foto(s) entraram no envio. ${erroUp} não foram — tente essas de novo.`, '⚠️');
-  }
-  iniciarPollFila();
-}
-
-function iniciarPollFila() {
-  if (filaPollTimer) clearInterval(filaPollTimer);
-  atualizarStatusFila();
-  filaPollTimer = setInterval(atualizarStatusFila, 3000);
-}
-
-// Acompanhamento da lista (a "esteira" que desce seguindo os envios do servidor).
-let filaRowsStatus = {};   // id -> ultimo status renderizado (atualiza so o que mudou)
-let filaSeguir = true;     // acompanhamento ligado (desliga se o usuario rola pra cima)
-let filaScrollAte = 0;     // janela de tempo do nosso proprio scroll suave
-
-function fila_pertoDoFim() {
-  return (document.documentElement.scrollHeight - (window.innerHeight + window.scrollY)) < 320;
-}
-function fila_aoRolar() {
-  const sec = document.getElementById('sec-fila');
-  if (!sec || !sec.classList.contains('active')) return;
-  if (Date.now() < filaScrollAte) return;   // foi o nosso scroll automatico, nao desliga
-  filaSeguir = fila_pertoDoFim();
-}
-window.addEventListener('scroll', fila_aoRolar, { passive: true });
-// Ao voltar pro app (desminimizar), a lista pula pro ponto atual e volta a seguir.
-document.addEventListener('visibilitychange', () => {
-  const sec = document.getElementById('sec-fila');
-  if (document.visibilityState === 'visible' && sec && sec.classList.contains('active')) {
-    filaSeguir = true;
-    atualizarStatusFila();
-  }
-});
-
-function fila_acompanhar(frontierId) {
-  if (!filaSeguir || frontierId == null) return;
-  const el = document.getElementById('fila-row-' + frontierId);
-  if (!el) return;
-  filaScrollAte = Date.now() + 1000;
-  const rect = el.getBoundingClientRect();
-  const alvo = window.scrollY + rect.top - (window.innerHeight * 0.4);
-  window.scrollTo({ top: alvo, behavior: 'smooth' });
-}
-
-function fila_htmlItem(it) {
-  const nome = it.nome ? escHtml(it.nome)
-    : (it.status === 'processando' ? 'Lendo etiqueta…' : (it.status === 'pendente' ? 'Na fila…' : 'Sem nome'));
-  let badge, det;
-  if (it.status === 'enviado') { badge = '<span class="badge badge-ok">Enviado</span>'; det = (it.telefone ? escHtml(it.telefone) + ' · ' : '') + '✓'; }
-  else if (it.status === 'processando') { badge = '<span class="badge badge-proc">Enviando</span>'; det = 'Lendo e enviando…'; }
-  else if (it.status === 'falhou') { badge = '<span class="badge badge-err">Falhou</span>'; det = escHtml(it.erro || 'Falhou'); }
-  else { badge = '<span class="badge badge-wait">Fila</span>'; det = 'Aguardando…'; }
-  let corr = '';
-  if (it.status === 'falhou') {
-    corr = `<div class="fi-corrigir">
-      <input type="tel" inputmode="numeric" placeholder="Número com DDD" value="${escHtml(it.telefone || '')}" id="fila-tel-${it.id}">
-      <button class="btn-mini-enviar" onclick="corrigirFalhaFila(${it.id})">Reenviar</button>
-      <button class="btn-mini-x" onclick="descartarFalhaFila(${it.id})">×</button>
-    </div>`;
-  }
-  return `<div class="fi-linha"><div class="fi-info"><div class="fi-nome">${nome}</div><div class="fi-det">${det}</div></div>${badge}</div>${corr}`;
-}
-
-function fila_renderLista(itens) {
-  const cont = document.getElementById('fila-lista');
-  if (!cont) return null;
-  let frontier = null;
-  itens.forEach(it => {
-    if (it.status !== 'pendente') frontier = it.id;   // ultimo item ja mexido = onde a acao esta
-    let row = document.getElementById('fila-row-' + it.id);
-    if (!row) {
-      row = document.createElement('div');
-      row.className = 'fila-item';
-      row.id = 'fila-row-' + it.id;
-      cont.appendChild(row);
-      filaRowsStatus[it.id] = null;
-    }
-    // so re-renderiza a linha quando o status muda (preserva o numero que a pessoa digita)
-    if (filaRowsStatus[it.id] !== it.status) {
-      row.innerHTML = fila_htmlItem(it);
-      filaRowsStatus[it.id] = it.status;
-    }
-  });
-  return frontier;
-}
-
-async function atualizarStatusFila() {
-  const codigo = localStorage.getItem('codigo_acesso');
-  if (!codigo) return;
-  let d;
-  try {
-    const r = await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/status?t=${Date.now()}`);
-    if (!r.ok) return;
-    d = await r.json();
-  } catch (e) { return; }
-  const cont = d.contagem || {};
-  const enviados = cont.enviado || 0;
-  const naFila = (cont.pendente || 0) + (cont.processando || 0);
-  const falhou = cont.falhou || 0;
-  document.getElementById('fila-n-enviados').textContent = enviados;
-  document.getElementById('fila-n-fila').textContent = naFila;
-  document.getElementById('fila-n-falhou').textContent = falhou;
-  const tot = enviados + naFila + falhou;
-  document.getElementById('fila-prog-fill').style.width = tot ? Math.round((enviados + falhou) / tot * 100) + '%' : '0%';
-
-  const itens = d.itens || [];
-  if (itens.length) document.getElementById('fila-lista-card').style.display = 'block';
-  const frontier = fila_renderLista(itens);
-  fila_acompanhar(frontier);
-}
-
-async function corrigirFalhaFila(id) {
-  const codigo = localStorage.getItem('codigo_acesso');
-  const campo = document.getElementById('fila-tel-' + id);
-  const tel = campo ? campo.value : '';
-  if (!tel || !tel.trim()) { mostrarAvisoCustomizado('Digite o número com DDD.', '📱'); return; }
-  try {
-    const r = await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/corrigir/${id}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ telefone: tel.trim() })
-    });
-    if (r.ok) { atualizarStatusFila(); } else { mostrarAvisoCustomizado('Não deu pra reenviar. Confira o número.', '⚠️'); }
-  } catch (e) { mostrarAvisoCustomizado('Sem conexão agora. Tente de novo.', '📶'); }
-}
-
-async function descartarFalhaFila(id) {
-  const codigo = localStorage.getItem('codigo_acesso');
-  try {
-    await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/item/${id}`, { method: 'DELETE' });
-    atualizarStatusFila();
-  } catch (e) {}
-}
-
-function voltarDaFila() {
-  if (filaPollTimer) { clearInterval(filaPollTimer); filaPollTimer = null; }
-  setSection('sec-upload');
-}
-
 function showDone(ok, err) {
   document.getElementById('s-total').textContent = dadosLidos.length;
   document.getElementById('s-ok').textContent = ok;
@@ -3131,7 +3026,6 @@ function resetApp() {
   document.getElementById('thumb-grid').innerHTML='';
   document.getElementById('file-input').value='';
   document.getElementById('btn-send').disabled=true;
-  { const _bss = document.getElementById('btn-send-servidor'); if (_bss) _bss.disabled=true; }
   setSection('sec-upload');
 }
 
