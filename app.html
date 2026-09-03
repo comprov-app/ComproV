@@ -395,7 +395,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.1</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.2</span></div>
 </div>
 
 <div class="container">
@@ -487,43 +487,6 @@
         <button class="btn btn-gray" onclick="resetMensagem()">↩️ Padrão</button>
       </div>
 
-      <div class="sec-card">
-        <div class="sec-head">
-          <span class="sec-ico">💵</span>
-          <span class="sec-titulo">Cobrar taxa de todos</span>
-        </div>
-        <div class="sec-desc">Todo o lote recebe a mesma taxa, mesmo sem $ na etiqueta</div>
-        <div class="switch-row">
-          <span class="switch-label">Ativar cobrança para todos</span>
-          <label class="switch">
-            <input type="checkbox" id="taxa-todos-toggle" onchange="toggleCampoTaxaTodos()" />
-            <span class="switch-track"></span>
-          </label>
-        </div>
-        <div id="campo-taxa-todos-valor" style="display:none; margin-top:14px;">
-          <div class="taxa-atalhos">
-            <button type="button" class="taxa-atalho" id="atalho-taxa-5" onclick="selecionarTaxaAtalho('5.00')">R$ 5</button>
-            <button type="button" class="taxa-atalho" id="atalho-taxa-10" onclick="selecionarTaxaAtalho('10.00')">R$ 10</button>
-          </div>
-          <input type="text" id="taxa-todos-valor" placeholder="Ou digite outro valor" inputmode="decimal" oninput="atualizarAtalhosTaxa()" />
-          <button class="btn btn-green" onclick="salvarTaxaTodos()" style="margin-top:12px;">💾 Salvar cobrança para todos</button>
-        </div>
-      </div>
-
-      <div class="sec-card">
-        <div class="sec-head">
-          <span class="sec-ico">💰</span>
-          <span class="sec-titulo">Dados do PIX</span>
-        </div>
-        <div class="sec-desc">Aparece na mensagem quando a etiqueta tem taxa</div>
-        <div class="sec-campo-label">Chave PIX</div>
-        <input type="text" id="pix-chave" placeholder="Sua Chave PIX" />
-        <div class="sec-campo-label" style="margin-top:10px;">Nome do titular</div>
-        <input type="text" id="pix-nome" placeholder="Nome completo" />
-        <div class="sec-campo-label" style="margin-top:10px;">Banco / Carteira <span class="opc">(opcional)</span></div>
-        <input type="text" id="pix-banco" placeholder="Mercado Pago" />
-        <button class="btn btn-green" onclick="saveConfig()" style="margin-top:14px;">💾 Salvar PIX</button>
-      </div>
     </div>
 
     <div id="tab-plano" style="display:none">
@@ -557,7 +520,6 @@
         <span>Pode selecionar várias de uma vez, ou arrastar para aqui</span>
       </div>
       <input type="file" id="file-input" accept="image/*" multiple onchange="onFilesSelected(this.files)">
-      <div id="aviso-taxa-todos" class="alert alert-warn" style="display:none; margin-top:12px;"></div>
       <div class="thumb-grid" id="thumb-grid"></div>
       <div class="alert alert-warn" id="aviso-intervalo" style="display:none; margin-top:12px;"></div>
     </div>
@@ -609,14 +571,6 @@
 <script>
 const MSG_PADRAO = `Olá {nome}, Seu pacote foi entregue! ✅`;
 
-const MSG_TAXA = `Olá, *{nome}*! Seu pacote foi entregue! ✅
-
-💵 Taxa cobrada pela Excursão: *R$ {taxa}*
-
-PIX: {pix_chave}
-Nome: {pix_nome}
-{pix_banco}`;
-
 let selectedFiles = [];
 
 // Escapa texto pra evitar XSS quando dados da etiqueta (lidos pela IA) entram no HTML.
@@ -637,12 +591,6 @@ function saveConfig() {
   // Intervalo: sempre 'auto' (a opção foi removida da tela por segurança)
   localStorage.setItem('intervalo_envio', 'auto');
   localStorage.setItem('msg_template',  document.getElementById('msg-template').value);
-  localStorage.setItem('taxa_todos_ativa', document.getElementById('taxa-todos-toggle').checked ? '1' : '0');
-  const taxaTodosVal = document.getElementById('taxa-todos-valor').value.trim().replace(',', '.');
-  localStorage.setItem('taxa_todos_valor', taxaTodosVal);
-  localStorage.setItem('pix_chave',     document.getElementById('pix-chave').value.trim());
-  localStorage.setItem('pix_nome',      document.getElementById('pix-nome').value.trim());
-  localStorage.setItem('pix_banco',     document.getElementById('pix-banco').value.trim());
   aplicarAparencia();
   atualizarVisibilidadeAbaApis();
   mostrarAvisoCustomizado('Configurações salvas!', '✅');
@@ -652,7 +600,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.1';
+const APP_VERSION = '6.3.2';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -791,13 +739,6 @@ function loadConfig() {
   localStorage.setItem('intervalo_envio', 'auto');
   document.getElementById('intervalo-envio').value = 'auto';
   document.getElementById('msg-template').value      = localStorage.getItem('msg_template') || MSG_PADRAO;
-  document.getElementById('taxa-todos-toggle').checked = localStorage.getItem('taxa_todos_ativa') === '1';
-  document.getElementById('taxa-todos-valor').value    = localStorage.getItem('taxa_todos_valor') || '';
-  atualizarAtalhosTaxa();
-  mostrarCampoTaxaTodos(document.getElementById('taxa-todos-toggle').checked);
-  document.getElementById('pix-chave').value         = localStorage.getItem('pix_chave') || '';
-  document.getElementById('pix-nome').value          = localStorage.getItem('pix_nome') || '';
-  document.getElementById('pix-banco').value         = localStorage.getItem('pix_banco') || '';
   atualizarResumoUsoMensal();
   aplicarAparencia();
   atualizarPreview();
@@ -853,60 +794,6 @@ function resetMensagem() {
 }
 
 // Chamada quando o USUARIO clica no toggle (onchange). Salva e avisa.
-function toggleCampoTaxaTodos() {
-  const ativado = document.getElementById('taxa-todos-toggle').checked;
-  mostrarCampoTaxaTodos(ativado);
-
-  // Salva o estado na hora (Opcao A): ao DESLIGAR, ja desativa de verdade no mesmo instante,
-  // evitando cobrar taxa por engano caso esqueca de clicar em Salvar.
-  localStorage.setItem('taxa_todos_ativa', ativado ? '1' : '0');
-
-  if (!ativado) {
-    // Desligou: confirma visualmente que parou de cobrar
-    atualizarAvisoTaxaTodos();
-    mostrarAvisoCustomizado('Cobrança de taxa para todos desativada.', '✅');
-  } else {
-    // Ligou: lembra de preencher o valor (se ainda nao tiver)
-    const valorSalvo = (localStorage.getItem('taxa_todos_valor') || '').trim();
-    if (!valorSalvo) {
-      mostrarAvisoCustomizado('Cobrança ativada! Agora escolha ou digite o valor da taxa e clique em Salvar.', '💵');
-    }
-  }
-}
-
-// Só mostra/esconde o campo (sem salvar nem avisar). Usada no carregamento do app.
-function mostrarCampoTaxaTodos(ativado) {
-  document.getElementById('campo-taxa-todos-valor').style.display = ativado ? 'block' : 'none';
-}
-
-// Clicou num botão de atalho (R$5 ou R$10): preenche o campo e destaca o botão
-function selecionarTaxaAtalho(valor) {
-  document.getElementById('taxa-todos-valor').value = valor;
-  atualizarAtalhosTaxa();
-}
-
-// Destaca o botão de atalho que bate com o valor digitado (ou nenhum, se for outro valor)
-function atualizarAtalhosTaxa() {
-  const val = (document.getElementById('taxa-todos-valor').value || '').trim().replace(',', '.');
-  const n = parseFloat(val);
-  const b5 = document.getElementById('atalho-taxa-5');
-  const b10 = document.getElementById('atalho-taxa-10');
-  if (b5) b5.classList.toggle('ativo', n === 5);
-  if (b10) b10.classList.toggle('ativo', n === 10);
-}
-
-function salvarTaxaTodos() {
-  const ativado = document.getElementById('taxa-todos-toggle').checked;
-  localStorage.setItem('taxa_todos_ativa', ativado ? '1' : '0');
-  const valorTexto = document.getElementById('taxa-todos-valor').value.trim().replace(',', '.');
-  if (ativado && (!valorTexto || isNaN(parseFloat(valorTexto)))) {
-    mostrarAvisoCustomizado('Digite um valor válido para a taxa antes de ativar a cobrança para todos.', '⚠️');
-    return;
-  }
-  localStorage.setItem('taxa_todos_valor', valorTexto);
-  atualizarAvisoTaxaTodos();
-  mostrarAvisoCustomizado(ativado ? 'Cobrança de taxa para todos ativada!' : 'Cobrança de taxa para todos desativada.', '✅');
-}
 
 // ===== INTERVALO ENTRE ENVIOS: SEMPRE AUTOMÁTICO =====
 // A opção foi removida da tela de propósito (segurança): o intervalo protege o
@@ -955,10 +842,7 @@ function atualizarPreview() {
     .replace(/{box}/g, '153')
     .replace(/{setor}/g, 'Verde / Calçadão - Rua B')
     .replace(/{status}/g, 'PAGO')
-    .replace(/{taxa}/g, '5.00')
-    .replace(/{pix_chave}/g, localStorage.getItem('pix_chave') || '(sua chave PIX)')
-    .replace(/{pix_nome}/g, localStorage.getItem('pix_nome') || '(seu nome)')
-    .replace(/{pix_banco}/g, localStorage.getItem('pix_banco') || '(seu banco)');
+    .replace(/{taxa}/g, '5.00');
   document.getElementById('msg-preview').textContent = preview;
 }
 
@@ -1009,20 +893,6 @@ function menuIr(destino) {
 function setSection(id) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if (id === 'sec-upload') atualizarAvisoTaxaTodos();
-}
-
-function atualizarAvisoTaxaTodos() {
-  const aviso = document.getElementById('aviso-taxa-todos');
-  if (!aviso) return;
-  const ativa = localStorage.getItem('taxa_todos_ativa') === '1';
-  const valor = localStorage.getItem('taxa_todos_valor');
-  if (ativa && valor) {
-    aviso.style.display = 'block';
-    aviso.innerHTML = `💵 <b>Cobrança de taxa ativada para todos!</b> Todos os comprovantes deste lote vão receber a mensagem de taxa de <b>R$ ${parseFloat(valor).toFixed(2)}</b>, mesmo sem $ na etiqueta. Desative em ⚙️ Painel → Mensagem se não for o caso.`;
-  } else {
-    aviso.style.display = 'none';
-  }
 }
 
 function showTab(id, btn) {
@@ -2104,13 +1974,6 @@ async function startProcessing() {
     try {
       const dados = await lerEtiqueta(selectedFiles[i]);
 
-      // Se "cobrar taxa de todos" estiver ativo, força a taxa em todo o lote,
-      // ignorando o $ / $$ lido da etiqueta
-      if (localStorage.getItem('taxa_todos_ativa') === '1') {
-        const valorForcado = localStorage.getItem('taxa_todos_valor');
-        if (valorForcado) dados.taxa = valorForcado;
-      }
-
       dadosParciais = dados;
       if (!dados || !dados.telefone) throw new Error('Número de telefone não encontrado na etiqueta.');
       updateItem(i, dados.nome || selectedFiles[i].name, `${dados.telefone} · Enviando...`, 'Enviando', 'badge-proc');
@@ -2292,17 +2155,7 @@ async function startProcessingServidor() {
 
   const inicioLote = Date.now();
   const codigo = codigoAcesso;
-  const cfgMsg = {
-    template: localStorage.getItem('msg_template') || MSG_PADRAO,
-    template_taxa: MSG_TAXA,
-    pix_chave: localStorage.getItem('pix_chave') || '(configure no Painel)',
-    pix_nome:  localStorage.getItem('pix_nome')  || '(configure no Painel)',
-    pix_banco: localStorage.getItem('pix_banco') || '(configure no Painel)',
-  };
-  if (localStorage.getItem('taxa_todos_ativa') === '1') {
-    const v = (localStorage.getItem('taxa_todos_valor') || '').trim();
-    if (v) cfgMsg.taxa_todos = v;
-  }
+  const cfgMsg = { template: localStorage.getItem('msg_template') || MSG_PADRAO };
   const intervaloManual = localStorage.getItem('intervalo_envio');
   const segundosIntervalo = (intervaloManual && intervaloManual !== 'auto')
     ? parseInt(intervaloManual, 10) : calcularIntervaloRecomendado(selectedFiles.length);
@@ -2751,18 +2604,9 @@ async function enviarMensagem(dados, serverUrl, instanceName, apiKey) {
 }
 
 function montarMensagem(dados) {
-  // Taxa só conta se for um número maior que zero. Cobre todos os casos de "sem taxa"
-  // que a IA possa devolver: "sem taxa", "", "0", "0.00", "0,00", null, etc.
-  const taxaComoNumero = parseFloat(String(dados.taxa == null ? '' : dados.taxa).replace(',', '.'));
-  const temTaxa = !isNaN(taxaComoNumero) && taxaComoNumero > 0;
-  const tpl = temTaxa ? MSG_TAXA : (localStorage.getItem('msg_template') || MSG_PADRAO);
-  const pixChave = localStorage.getItem('pix_chave') || '(configure no Painel)';
-  const pixNome  = localStorage.getItem('pix_nome') || '(configure no Painel)';
-  const pixBanco = localStorage.getItem('pix_banco') || '(configure no Painel)';
-  // Garante 2 casas decimais sempre (evita "R$ 5" em vez de "R$ 5,00" quando o valor
-  // vem do campo manual de "cobrar taxa de todos", digitado sem decimais)
+  const tpl = localStorage.getItem('msg_template') || MSG_PADRAO;
   let taxaFormatada = dados.taxa || '?';
-  const taxaNum = parseFloat(String(dados.taxa).replace(',', '.'));
+  const taxaNum = parseFloat(String(dados.taxa == null ? '' : dados.taxa).replace(',', '.'));
   if (!isNaN(taxaNum)) taxaFormatada = taxaNum.toFixed(2);
   return tpl
     .replace(/{nome}/g, dados.nome || '?')
@@ -2770,9 +2614,7 @@ function montarMensagem(dados) {
     .replace(/{setor}/g, dados.setor || '?')
     .replace(/{status}/g, dados.status || 'PAGO')
     .replace(/{taxa}/g, taxaFormatada)
-    .replace(/{pix_chave}/g, pixChave)
-    .replace(/{pix_nome}/g, pixNome)
-    .replace(/{pix_banco}/g, pixBanco);
+    .replace(/{pix_chave}|{pix_nome}|{pix_banco}/g, '');
 }
 
 function showDone(ok, err) {
@@ -3119,7 +2961,6 @@ function toggleTheme() {
 
 aplicarTema();
 loadConfig();
-atualizarAvisoTaxaTodos();
 verificarFotosCompartilhadas();
 
 // Ao abrir o app, sincroniza com o backend em segundo plano para pegar
