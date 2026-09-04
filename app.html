@@ -395,7 +395,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.3</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.4</span></div>
 </div>
 
 <div class="container">
@@ -600,7 +600,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.3';
+const APP_VERSION = '6.3.4';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2110,6 +2110,13 @@ async function startProcessing() {
 // quando o navegador vai pra segundo plano — o app SOBE as fotos pra fila e o
 // servidor envia sozinho, no ritmo certo. A tela vai marcando pelo status da fila,
 // entao pode minimizar/abrir outro app que continua.
+// Guarda a checagem da fila do lote em andamento, pra atualizar a tela NA HORA
+// quando o app volta do segundo plano (senao a tela fica parada e parece que "parou").
+let _filaCheckAtual = null;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && _filaCheckAtual) { try { _filaCheckAtual(); } catch(e){} }
+});
+
 async function startProcessingServidor() {
   const codigoAcesso = localStorage.getItem('codigo_acesso');
   const evoServer   = localStorage.getItem('evo_server');
@@ -2195,6 +2202,10 @@ async function startProcessingServidor() {
         updateItem(i, it.nome || selectedFiles[i].name, `${it.telefone || ''} · ✓ Enviado`, 'Enviado', 'badge-ok');
         dadosLidos[i] = { ...(it.dados || {}), nome: it.nome, telefone: it.telefone, file:selectedFiles[i], previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, sucesso:true };
         if (hashPorIndice[i]) registrarHashEnviado(hashPorIndice[i]);
+        // Se veio da coleta, apaga do cofre depois de enviada (nao reaparece la).
+        if (selectedFiles[i] && selectedFiles[i]._coletaId) {
+          fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/foto/${selectedFiles[i]._coletaId}`, { method:'DELETE' }).catch(()=>{});
+        }
         ok++; terminados++;
       } else if (it.status === 'falhou') {
         updateItem(i, it.nome || selectedFiles[i].name, it.erro || 'Falhou', 'Erro', 'badge-err');
@@ -2226,6 +2237,7 @@ async function startProcessingServidor() {
 
   // O acompanhamento roda EM PARALELO com a subida, pra os envios irem aparecendo
   // um a um ja durante o upload (o servidor comeca a mandar assim que a 1a foto chega).
+  _filaCheckAtual = checarFila;   // permite atualizar a tela na hora ao voltar do 2o plano
   const acompanhamento = (async () => {
     while (true) {
       let fim = false;
@@ -2263,6 +2275,7 @@ async function startProcessingServidor() {
   uploadConcluido = true;
 
   await acompanhamento;
+  _filaCheckAtual = null;
 
   clearInterval(timerPausa);
   loteEmAndamento = false;
@@ -2495,20 +2508,51 @@ async function enviarFotoColeta(id, silencioso){
   }
 }
 
+// Converte base64 puro em Blob (pra virar um File local que o envio principal usa).
+function base64ParaBlob(b64, tipo){
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: tipo || 'image/jpeg' });
+}
+
+// "Enviar todas" da coleta: baixa as fotos do cofre, joga na PAGINA PRINCIPAL
+// (selectedFiles) e manda pela FILA DO SERVIDOR — assim continua mesmo minimizado
+// e ganha o reenvio com foto pras que falharem. Cada foto leva o _coletaId pra ser
+// apagada do cofre depois de enviada (ver checarFila em startProcessingServidor).
 async function enviarTodasColeta(){
   if(coletaEnviando || !coletaFotos.length) return;
   coletaEnviando = true;
-  document.getElementById('coleta-enviar-todas').style.display = 'none';
-  const ids = coletaFotos.map(f => f.id);
-  let ok = 0, err = 0;
-  for(let i = 0; i < ids.length; i++){
-    coletaStatus(`📤 Enviando ${i+1} de ${ids.length}…`);
-    const r = await enviarFotoColeta(ids[i], true);
-    if(r === true) ok++; else err++;
+  const codigo = localStorage.getItem('codigo_acesso');
+  const btn = document.getElementById('coleta-enviar-todas');
+  const rotulo = `📲 Enviar todas (${coletaFotos.length})`;
+  if(btn){ btn.disabled = true; btn.textContent = 'Preparando…'; }
+  try {
+    const arquivos = [];
+    const lista = coletaFotos.slice();
+    for(let i = 0; i < lista.length; i++){
+      coletaStatus(`⬇️ Preparando ${i+1} de ${lista.length}…`);
+      try {
+        const rImg = await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/foto/${lista[i].id}`);
+        if(!rImg.ok) continue;
+        const dImg = await rImg.json();
+        if(!dImg || !dImg.imagem_base64) continue;
+        const file = new File([base64ParaBlob(dImg.imagem_base64, 'image/jpeg')], 'coleta-' + lista[i].id + '.jpg', { type:'image/jpeg' });
+        file._coletaId = lista[i].id;   // pra apagar do cofre depois de enviada
+        arquivos.push(file);
+      } catch(e){ /* pula essa e segue */ }
+    }
+    coletaEnviando = false;
+    if(btn){ btn.disabled = false; btn.textContent = rotulo; }
+    if(!arquivos.length){ coletaStatus('⚠️ Não consegui carregar as fotos. Toque em Atualizar e tente de novo.'); return; }
+    // Vai pela pagina principal (fila do servidor + reenvio com foto).
+    selectedFiles = arquivos;
+    await startProcessingServidor();
+  } catch(e){
+    coletaEnviando = false;
+    if(btn){ btn.disabled = false; btn.textContent = rotulo; }
+    coletaStatus('⚠️ ' + (e.message || 'Erro ao preparar o envio.'));
   }
-  coletaEnviando = false;
-  atualizarUIColeta();
-  coletaStatus(`✅ Enviados: ${ok}.${err ? ` ${err} ficaram na lista (confira o telefone e envie manual).` : ''}`);
 }
 
 async function descartarFotoColeta(id){
