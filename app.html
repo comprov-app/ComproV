@@ -395,7 +395,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.2</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.3</span></div>
 </div>
 
 <div class="container">
@@ -600,7 +600,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.2';
+const APP_VERSION = '6.3.3';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2168,9 +2168,76 @@ async function startProcessingServidor() {
   const hashPorIndice = new Array(selectedFiles.length).fill(null);
   const progText = document.getElementById('prog-text');
 
-  // ===== SOBE cada foto pra fila (o servidor comeca a enviar assim que chega) =====
+  // ----- Indicador de pausa (igual o antigo "Aguardando Xs"): um timer de 1s vai
+  // escrevendo a contagem regressiva enquanto o servidor esta na pausa entre envios.
+  let uploadConcluido = false;
+  let estadoEnvio = 'subindo';   // 'subindo' | 'enviando' | 'aguardando' | 'fim'
+  let ultimoEnvioMs = Date.now();
+  let enviadosVistos = 0;
+  const timerPausa = setInterval(() => {
+    if (estadoEnvio !== 'aguardando' || !progText) return;
+    const restante = Math.max(0, Math.ceil(segundosIntervalo - (Date.now() - ultimoEnvioMs) / 1000));
+    progText.textContent = restante > 0 ? `Aguardando ${restante}s antes do próximo envio…` : 'Enviando o próximo…';
+  }, 1000);
+
+  // Uma passada de acompanhamento: le o status do servidor e marca os itens UM A UM.
+  async function checarFila() {
+    let d = null;
+    try { const r = await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/status?t=${Date.now()}`); if (r.ok) d = await r.json(); } catch(e){}
+    if (!d || !d.itens) return false;
+    const mapa = {}; d.itens.forEach(it => { mapa[it.id] = it; });
+    let terminados = 0, algumEnviando = false, algumAguardando = false;
+    for (let i = 0; i < selectedFiles.length; i++) {
+      if (dadosLidos[i]) { terminados++; continue; }
+      const it = filaIds[i] != null ? mapa[filaIds[i]] : null;
+      if (!it) continue; // ainda nao subiu
+      if (it.status === 'enviado') {
+        updateItem(i, it.nome || selectedFiles[i].name, `${it.telefone || ''} · ✓ Enviado`, 'Enviado', 'badge-ok');
+        dadosLidos[i] = { ...(it.dados || {}), nome: it.nome, telefone: it.telefone, file:selectedFiles[i], previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, sucesso:true };
+        if (hashPorIndice[i]) registrarHashEnviado(hashPorIndice[i]);
+        ok++; terminados++;
+      } else if (it.status === 'falhou') {
+        updateItem(i, it.nome || selectedFiles[i].name, it.erro || 'Falhou', 'Erro', 'badge-err');
+        dadosLidos[i] = { ...(it.dados || {}), nome: it.nome || selectedFiles[i].name, telefone: it.telefone, file:selectedFiles[i], previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, sucesso:false, erro: it.erro };
+        err++; terminados++;
+      } else if (it.status === 'processando') {
+        updateItem(i, it.nome || selectedFiles[i].name, 'Enviando…', 'Enviando', 'badge-proc');
+        algumEnviando = true;
+      } else {
+        // pendente: ja subiu, esperando a vez. NAO marca "Na fila" em massa — deixa
+        // discreto ("Aguardando..." do inicio) pra os envios aparecerem um a um.
+        algumAguardando = true;
+      }
+    }
+    // Detecta um novo envio -> reinicia a contagem da pausa.
+    if (ok > enviadosVistos) { enviadosVistos = ok; ultimoEnvioMs = Date.now(); }
+    // Barra de progresso (sem mexer no texto — o texto reflete o estado abaixo).
+    const fill = document.getElementById('prog-fill'), pct = document.getElementById('prog-pct');
+    const p = selectedFiles.length ? Math.round(terminados / selectedFiles.length * 100) : 0;
+    if (fill) fill.style.width = p + '%';
+    if (pct) pct.textContent = p + '%';
+    // Estado + texto ('aguardando' quem escreve e o timer, pra ter contagem regressiva).
+    if (!uploadConcluido) { estadoEnvio = 'subindo'; }
+    else if (algumEnviando) { estadoEnvio = 'enviando'; if (progText) progText.textContent = 'Enviando comprovante…'; }
+    else if (algumAguardando) { estadoEnvio = 'aguardando'; }
+    else { estadoEnvio = 'fim'; }
+    return (uploadConcluido && terminados >= selectedFiles.length);
+  }
+
+  // O acompanhamento roda EM PARALELO com a subida, pra os envios irem aparecendo
+  // um a um ja durante o upload (o servidor comeca a mandar assim que a 1a foto chega).
+  const acompanhamento = (async () => {
+    while (true) {
+      let fim = false;
+      try { fim = await checarFila(); } catch(e){}
+      if (fim) break;
+      await sleep(2000);
+    }
+  })();
+
+  // ===== SOBE cada foto pra fila =====
   for (let i = 0; i < selectedFiles.length; i++) {
-    if (progText) progText.textContent = `Preparando ${i + 1} de ${selectedFiles.length}...`;
+    if (progText && estadoEnvio === 'subindo') progText.textContent = `Preparando ${i + 1} de ${selectedFiles.length}…`;
     const hash = await calcularHashArquivo(selectedFiles[i]);
     hashPorIndice[i] = hash;
     if (jaFoiEnviadoAntes(hash)) {
@@ -2178,7 +2245,6 @@ async function startProcessingServidor() {
       dadosLidos[i] = { nome:selectedFiles[i].name, file:selectedFiles[i], sucesso:false, duplicado:true, previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, erro:'Esta foto já foi enviada anteriormente.' };
       err++; continue;
     }
-    updateItem(i, selectedFiles[i].name, 'Na fila...', 'Na fila', 'badge-wait');
     try {
       const b64 = await toBase64(selectedFiles[i]);
       const r = await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/adicionar`, {
@@ -2194,40 +2260,11 @@ async function startProcessingServidor() {
       err++;
     }
   }
+  uploadConcluido = true;
 
-  // ===== ACOMPANHA a fila: o servidor envia e a tela vai marcando (igual antes) =====
-  await new Promise((resolve) => {
-    async function checar() {
-      let d = null;
-      try { const r = await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/status?t=${Date.now()}`); if (r.ok) d = await r.json(); } catch(e){}
-      if (d && d.itens) {
-        const mapa = {}; d.itens.forEach(it => { mapa[it.id] = it; });
-        let terminados = 0;
-        for (let i = 0; i < selectedFiles.length; i++) {
-          if (dadosLidos[i]) { terminados++; continue; }
-          const it = filaIds[i] != null ? mapa[filaIds[i]] : null;
-          if (!it) continue;
-          if (it.status === 'enviado') {
-            updateItem(i, it.nome || selectedFiles[i].name, `${it.telefone || ''} · ✓ Enviado`, 'Enviado', 'badge-ok');
-            dadosLidos[i] = { ...(it.dados || {}), nome: it.nome, telefone: it.telefone, file:selectedFiles[i], previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, sucesso:true };
-            if (hashPorIndice[i]) registrarHashEnviado(hashPorIndice[i]);
-            ok++; terminados++;
-          } else if (it.status === 'falhou') {
-            updateItem(i, it.nome || selectedFiles[i].name, it.erro || 'Falhou', 'Erro', 'badge-err');
-            dadosLidos[i] = { ...(it.dados || {}), nome: it.nome || selectedFiles[i].name, telefone: it.telefone, file:selectedFiles[i], previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, sucesso:false, erro: it.erro };
-            err++; terminados++;
-          } else if (it.status === 'processando') {
-            updateItem(i, it.nome || selectedFiles[i].name, 'Enviando...', 'Enviando', 'badge-proc');
-          }
-        }
-        updateProgress(terminados, selectedFiles.length);
-        if (terminados >= selectedFiles.length) { resolve(); return; }
-      }
-      setTimeout(checar, 3000);
-    }
-    checar();
-  });
+  await acompanhamento;
 
+  clearInterval(timerPausa);
   loteEmAndamento = false;
   window.envioNoServidor = false;
   liberarWakeLock();
