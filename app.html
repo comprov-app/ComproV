@@ -395,7 +395,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.4</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.5</span></div>
 </div>
 
 <div class="container">
@@ -600,7 +600,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.4';
+const APP_VERSION = '6.3.5';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2892,6 +2892,9 @@ function renderCalendarioHistorico() {
   `;
 }
 
+// Guarda os itens do dia que está aberto, pra busca por nome/telefone filtrar sem reprocessar tudo.
+let itensDiaHistorico = [];
+
 // Mostra os detalhes de um dia específico (quantos envios, quais lojas) abaixo do calendário.
 function mostrarDiaHistorico(chave) {
   const porDia = agruparHistoricoPorDia();
@@ -2905,10 +2908,16 @@ function mostrarDiaHistorico(chave) {
   // Junta todos os itens de todos os lotes daquele dia
   const todosItens = [];
   dados.lotes.forEach(lote => (lote.itens || []).forEach(it => todosItens.push(it)));
+  itensDiaHistorico = todosItens;
 
   const valorTaxas = todosItens
     .filter(it => it.taxa)
     .reduce((soma, it) => soma + (parseFloat(it.taxa) || 0), 0);
+
+  // Só mostra a busca quando vale a pena (2 ou mais envios no dia)
+  const buscaHtml = todosItens.length > 1
+    ? `<input type="text" id="cal-busca" placeholder="🔎 Buscar por nome ou telefone" autocomplete="off" data-lpignore="true" oninput="filtrarDiaHistorico()" style="margin-bottom:10px;">`
+    : '';
 
   det.innerHTML = `
     <div class="card" style="margin-top:14px;">
@@ -2916,18 +2925,45 @@ function mostrarDiaHistorico(chave) {
       <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">
         <b style="color:var(--text-primary)">${dados.enviados}</b> envios${dados.erros > 0 ? ` · ${dados.erros} erro(s)` : ''}${dados.lotes.length > 1 ? ` · ${dados.lotes.length} lotes` : ''}${valorTaxas > 0 ? ` · R$ ${valorTaxas.toFixed(2)} em taxas` : ''}
       </div>
-      ${todosItens.map(it => `
-        <div class="item-row" style="padding:6px 0;">
-          <div class="item-info">
-            <div class="name" style="font-size:12px;">${escHtml(it.nome || '?')}</div>
-            <div class="detail">${escHtml(it.telefone || '')}${it.taxa ? ` · R$ ${parseFloat(it.taxa).toFixed(2)}` : ''}</div>
-          </div>
-          <span class="badge ${it.sucesso ? 'badge-ok' : 'badge-err'}" style="font-size:10px;">${it.sucesso ? 'Enviado' : 'Erro'}</span>
-        </div>
-      `).join('')}
+      ${buscaHtml}
+      <div id="cal-itens-lista"></div>
     </div>
   `;
+  filtrarDiaHistorico();
   det.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Filtra os itens do dia aberto pela busca. Nome casa por texto; telefone casa por dígitos,
+// então funciona digitando com ou sem máscara (ex.: "(73) 98763" ou "7398763" acham o mesmo).
+function filtrarDiaHistorico() {
+  const cont = document.getElementById('cal-itens-lista');
+  if (!cont) return;
+  const inp = document.getElementById('cal-busca');
+  const termo = (inp ? inp.value : '').trim().toLowerCase();
+  const termoDigitos = termo.replace(/\D/g, '');
+
+  const lista = itensDiaHistorico.filter(it => {
+    if (!termo) return true;
+    const casaNome = (it.nome || '').toLowerCase().includes(termo);
+    const telDigitos = (it.telefone || '').replace(/\D/g, '');
+    const casaTel = termoDigitos.length > 0 && telDigitos.includes(termoDigitos);
+    return casaNome || casaTel;
+  });
+
+  if (lista.length === 0) {
+    cont.innerHTML = `<div style="font-size:12px; color:var(--text-secondary); text-align:center; padding:12px 0;">Nenhum envio encontrado.</div>`;
+    return;
+  }
+
+  cont.innerHTML = lista.map(it => `
+    <div class="item-row" style="padding:6px 0;">
+      <div class="item-info">
+        <div class="name" style="font-size:12px;">${escHtml(it.nome || '?')}</div>
+        <div class="detail">${escHtml(it.telefone || '')}${it.taxa ? ` · R$ ${parseFloat(it.taxa).toFixed(2)}` : ''}</div>
+      </div>
+      <span class="badge ${it.sucesso ? 'badge-ok' : 'badge-err'}" style="font-size:10px;">${it.sucesso ? 'Enviado' : 'Erro'}</span>
+    </div>
+  `).join('');
 }
 
 function limparHistorico() {
