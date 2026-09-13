@@ -395,7 +395,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.6</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.7</span></div>
 </div>
 
 <div class="container">
@@ -425,6 +425,7 @@
       <div id="coleta-vazio" style="text-align:center; color:#999; padding:26px 10px; font-size:14px;">Nenhuma foto recebida ainda.<br>Assim que o colaborador enviar, aparece aqui.</div>
     </div>
     <button class="btn btn-green" id="coleta-enviar-todas" onclick="enviarTodasColeta()" style="display:none;">📲 Enviar todas</button>
+    <button class="btn btn-gray" id="coleta-limpar-todas" onclick="limparTodasColeta()" style="display:none; margin-top:8px;">🗑️ Limpar todas</button>
   </div>
 
   <!-- ========== PAINEL ========== -->
@@ -600,7 +601,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.6';
+const APP_VERSION = '6.3.7';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2437,16 +2438,22 @@ async function listarFotosColeta(){
 function atualizarUIColeta(){
   const vazio = document.getElementById('coleta-vazio');
   const btnTodas = document.getElementById('coleta-enviar-todas');
+  const btnLimpar = document.getElementById('coleta-limpar-todas');
   const tit = document.getElementById('coleta-fotos-tit');
   if(coletaFotos.length === 0){
     vazio.style.display = 'block';
     btnTodas.style.display = 'none';
+    if(btnLimpar) btnLimpar.style.display = 'none';
     tit.textContent = '📷 Fotos recebidas';
   } else {
     vazio.style.display = 'none';
     tit.textContent = `📷 Fotos recebidas (${coletaFotos.length})`;
     btnTodas.style.display = coletaEnviando ? 'none' : 'block';
     btnTodas.textContent = `📲 Enviar todas (${coletaFotos.length})`;
+    if(btnLimpar){
+      btnLimpar.style.display = coletaEnviando ? 'none' : 'block';
+      btnLimpar.textContent = `🗑️ Limpar todas (${coletaFotos.length})`;
+    }
   }
 }
 
@@ -2565,6 +2572,28 @@ async function enviarTodasColeta(){
     coletaEnviando = false;
     if(btn){ btn.disabled = false; btn.textContent = rotulo; }
     coletaStatus('⚠️ ' + (e.message || 'Erro ao preparar o envio.'));
+  }
+}
+
+// Apaga TODAS as fotos da coleta de uma vez (as que o funcionário mandou pelo link).
+async function limparTodasColeta(){
+  if(coletaEnviando || !coletaFotos.length) return;
+  const qtd = coletaFotos.length;
+  if(!(await confirmarCustomizadoAsync(`Apagar TODAS as ${qtd} fotos recebidas? Elas não serão enviadas e essa ação não pode ser desfeita.`, '🗑️'))) return;
+  const codigo = localStorage.getItem('codigo_acesso');
+  const btn = document.getElementById('coleta-limpar-todas');
+  if(btn){ btn.disabled = true; btn.textContent = 'Limpando…'; }
+  try {
+    const r = await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/fotos`, { method:'DELETE' });
+    if(!r.ok) throw new Error('falhou');
+    coletaFotos = [];
+    document.getElementById('coleta-grid').innerHTML = '';
+    atualizarUIColeta();
+    coletaStatus(`✅ ${qtd} foto${qtd>1?'s':''} apagada${qtd>1?'s':''}.`);
+  } catch(e){
+    coletaStatus('⚠️ Não consegui limpar. Toque em Atualizar e tente de novo.');
+  } finally {
+    if(btn) btn.disabled = false;
   }
 }
 
