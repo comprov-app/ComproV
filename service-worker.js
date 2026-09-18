@@ -1,6 +1,6 @@
 // Service Worker para D'Leia Comprovantes
 // Versão do app — MUDE ESTE NÚMERO sempre que atualizar o app
-const APP_VERSION = '6.3.7';
+const APP_VERSION = '6.3.9';
 const CACHE_NAME = 'dleia-comprovante-' + APP_VERSION;
 
 const ASSETS_TO_CACHE = [
@@ -74,19 +74,27 @@ self.addEventListener('fetch', (event) => {
 async function handleShareTarget(event) {
   try {
     const formData = await event.request.formData();
-    const arquivos = formData.getAll('fotos-compartilhadas');
+    const arquivos = formData.getAll('fotos-compartilhadas').filter((a) => a && a.size > 0);
 
     const db = await abrirBancoCompartilhamento();
-    const tx = db.transaction('fotos', 'readwrite');
-    const store = tx.objectStore('fotos');
-    await store.clear();
-    for (const arquivo of arquivos) {
-      await store.add(arquivo);
-    }
+    // Guarda TUDO numa transação só e espera ela terminar de verdade (oncomplete).
+    // O erro antigo era usar await em cada add(): o navegador fecha a transação antes
+    // de todas as fotos serem gravadas.
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('fotos', 'readwrite');
+      const store = tx.objectStore('fotos');
+      store.clear();
+      for (const arquivo of arquivos) store.add(arquivo);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    db.close();
 
-    return Response.redirect('./app.html?compartilhado=1', 303);
+    // URL ABSOLUTA: Response.redirect exige URL absoluta (com uma relativa ela estoura).
+    return Response.redirect(new URL('app.html?compartilhado=1', self.location).href, 303);
   } catch (e) {
-    return Response.redirect('./app.html', 303);
+    return Response.redirect(new URL('app.html', self.location).href, 303);
   }
 }
 
