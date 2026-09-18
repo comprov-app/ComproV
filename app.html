@@ -395,7 +395,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.13</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.14</span></div>
 </div>
 
 <div class="container">
@@ -601,7 +601,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.13';
+const APP_VERSION = '6.3.14';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -1275,7 +1275,7 @@ function atualizarLinhaResultado(i, telefone) {
   const linha = document.getElementById('recuperar-' + i);
   if (linha) {
     const info = linha.querySelector('.item-info .detail');
-    if (info) info.textContent = telefone;
+    if (info) info.textContent = mascararTelefone(telefone);
     const botao = linha.querySelector('.btn-share');
     if (botao) botao.outerHTML = '<span class="badge badge-ok">Enviado</span>';
   }
@@ -1459,6 +1459,17 @@ function acompanharItem(i) {
 }
 
 window.addEventListener('scroll', aoRolarTela, { passive: true });
+
+// Esconde o número do cliente na tela de envios (privacidade): mostra só os 4
+// últimos dígitos, o resto vira ponto. Ex.: (73) 98763-3213 -> ••••-3213
+// Assim ninguém que olhe a tela durante a feira vê o número inteiro, mas você
+// ainda consegue distinguir os envios.
+function mascararTelefone(tel) {
+  const d = String(tel == null ? '' : tel).replace(/\D/g, '');
+  if (!d) return '';
+  if (d.length <= 4) return '••••';
+  return '••••-' + d.slice(-4);
+}
 
 function updateItem(i, nome, detail, badge, badgeClass) {
   const n = document.getElementById('iname-'+i);
@@ -1990,9 +2001,9 @@ async function startProcessing() {
 
       dadosParciais = dados;
       if (!dados || !dados.telefone) throw new Error('Número de telefone não encontrado na etiqueta.');
-      updateItem(i, dados.nome || selectedFiles[i].name, `${dados.telefone} · Enviando...`, 'Enviando', 'badge-proc');
+      updateItem(i, dados.nome || selectedFiles[i].name, `${mascararTelefone(dados.telefone)} · Enviando...`, 'Enviando', 'badge-proc');
       await enviarFoto(selectedFiles[i], dados, evoServer, evoInstance);
-      updateItem(i, dados.nome, `${dados.telefone} · ✓ Enviado`, 'Enviado', 'badge-ok');
+      updateItem(i, dados.nome, `${mascararTelefone(dados.telefone)} · ✓ Enviado`, 'Enviado', 'badge-ok');
       dadosLidos.push({ ...dados, file: selectedFiles[i], previewUrl: items[i].previewUrl, thumbComprimida: items[i].thumbComprimida, sucesso: true });
       // O contador já foi incrementado pelo servidor dentro de enviarFoto (/enviar)
       registrarHashEnviado(hashArquivo);
@@ -2085,7 +2096,7 @@ async function startProcessing() {
           }
           await enviarFoto(item.file, item.dadosEnvio, evoServer, evoInstance);
           // Deu certo! Atualiza status e contadores
-          updateItem(idx, item.dadosEnvio.nome, `${item.dadosEnvio.telefone} · ✓ Enviado`, 'Enviado', 'badge-ok');
+          updateItem(idx, item.dadosEnvio.nome, `${mascararTelefone(item.dadosEnvio.telefone)} · ✓ Enviado`, 'Enviado', 'badge-ok');
           item.sucesso = true;
           item.erro = null;
           item.falhaConexao = false;
@@ -2213,7 +2224,7 @@ async function startProcessingServidor() {
       const it = filaIds[i] != null ? mapa[filaIds[i]] : null;
       if (!it) continue; // ainda nao subiu
       if (it.status === 'enviado') {
-        updateItem(i, it.nome || selectedFiles[i].name, `${it.telefone || ''} · ✓ Enviado`, 'Enviado', 'badge-ok');
+        updateItem(i, it.nome || selectedFiles[i].name, `${mascararTelefone(it.telefone)} · ✓ Enviado`, 'Enviado', 'badge-ok');
         dadosLidos[i] = { ...(it.dados || {}), nome: it.nome, telefone: it.telefone, file:selectedFiles[i], previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, fotoMedia:items[i].fotoMedia, sucesso:true };
         if (hashPorIndice[i]) registrarHashEnviado(hashPorIndice[i]);
         // Se veio da coleta, apaga do cofre depois de enviada (nao reaparece la).
@@ -2765,7 +2776,7 @@ function showDone(ok, err) {
       <img class="item-thumb" src="${r.thumbComprimida || r.previewUrl}" loading="lazy" onclick="abrirFotoResultado(${i})" style="cursor:pointer;" title="Toque para ampliar" />
       <div class="item-info">
         <div class="name">${escHtml(r.nome||'?')}</div>
-        <div class="detail">${escHtml(r.telefone||r.erro||'')}</div>
+        <div class="detail">${r.telefone ? escHtml(mascararTelefone(r.telefone)) : escHtml(r.erro||'')}</div>
         ${status}
       </div>
     </div>`;
