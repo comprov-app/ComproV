@@ -1,6 +1,6 @@
 // Service Worker para D'Leia Comprovantes
 // Versão do app — MUDE ESTE NÚMERO sempre que atualizar o app
-const APP_VERSION = '6.3.11';
+const APP_VERSION = '6.3.12';
 const CACHE_NAME = 'dleia-comprovante-' + APP_VERSION;
 
 const ASSETS_TO_CACHE = [
@@ -105,18 +105,9 @@ async function handleShareTarget(event) {
     if (arquivos.length > 0) {
       return Response.redirect(new URL('app.html?compartilhado=1', self.location).href, 303);
     }
-    // Nenhuma foto veio: monta um "raio-x" do que realmente chegou no
-    // compartilhamento, pra descobrir COMO o aparelho está mandando as imagens.
-    const partes = [];
-    try {
-      for (const par of formData.entries()) {
-        const k = par[0]; const v = par[1];
-        if (v && typeof v === 'object') partes.push(k + '=arquivo(' + (v.type || 'sem-tipo') + ',' + (v.size || 0) + 'b)');
-        else partes.push(k + '=texto:' + String(v).slice(0, 40));
-      }
-    } catch (e) {}
-    const d = encodeURIComponent((partes.join('  |  ') || 'nada chegou').slice(0, 250));
-    return Response.redirect(new URL('app.html?compartilhado=vazio&d=' + d, self.location).href, 303);
+    // Chegou o compartilhamento, mas o aparelho nao anexou nenhuma foto (acontece
+    // em alguns Android/Samsung). O app avisa e orienta a usar "selecionar as fotos".
+    return Response.redirect(new URL('app.html?compartilhado=vazio', self.location).href, 303);
   } catch (e) {
     return Response.redirect(new URL('app.html?compartilhado=erro', self.location).href, 303);
   }
