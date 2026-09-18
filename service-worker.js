@@ -1,6 +1,6 @@
 // Service Worker para D'Leia Comprovantes
 // Versão do app — MUDE ESTE NÚMERO sempre que atualizar o app
-const APP_VERSION = '6.3.12';
+const APP_VERSION = '6.3.13';
 const CACHE_NAME = 'dleia-comprovante-' + APP_VERSION;
 
 const ASSETS_TO_CACHE = [
@@ -74,42 +74,19 @@ self.addEventListener('fetch', (event) => {
 async function handleShareTarget(event) {
   try {
     const formData = await event.request.formData();
-
-    // Pega as fotos pelo nome de campo do manifest ('fotos-compartilhadas')...
-    let arquivos = formData.getAll('fotos-compartilhadas').filter((a) => a && a.size > 0);
-    // ...e se vier vazio (alguns celulares, como Samsung, usam OUTRO nome de campo),
-    // varre TUDO que chegou e pega qualquer imagem. Assim funciona em mais aparelhos.
-    if (arquivos.length === 0) {
-      for (const par of formData.entries()) {
-        const v = par[1];
-        if (v && typeof v === 'object' && v.size > 0 && (!v.type || v.type.indexOf('image/') === 0)) {
-          arquivos.push(v);
-        }
-      }
-    }
+    const arquivos = formData.getAll('fotos-compartilhadas');
 
     const db = await abrirBancoCompartilhamento();
-    // Guarda TUDO numa transação só e espera ela terminar de verdade (oncomplete).
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction('fotos', 'readwrite');
-      const store = tx.objectStore('fotos');
-      store.clear();
-      for (const arquivo of arquivos) store.add(arquivo);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
-    });
-    db.close();
-
-    // URL ABSOLUTA: Response.redirect exige URL absoluta (relativa estoura por spec).
-    if (arquivos.length > 0) {
-      return Response.redirect(new URL('app.html?compartilhado=1', self.location).href, 303);
+    const tx = db.transaction('fotos', 'readwrite');
+    const store = tx.objectStore('fotos');
+    await store.clear();
+    for (const arquivo of arquivos) {
+      await store.add(arquivo);
     }
-    // Chegou o compartilhamento, mas o aparelho nao anexou nenhuma foto (acontece
-    // em alguns Android/Samsung). O app avisa e orienta a usar "selecionar as fotos".
-    return Response.redirect(new URL('app.html?compartilhado=vazio', self.location).href, 303);
+
+    return Response.redirect('./app.html?compartilhado=1', 303);
   } catch (e) {
-    return Response.redirect(new URL('app.html?compartilhado=erro', self.location).href, 303);
+    return Response.redirect('./app.html', 303);
   }
 }
 

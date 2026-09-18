@@ -395,7 +395,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.12</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.13</span></div>
 </div>
 
 <div class="container">
@@ -601,7 +601,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.12';
+const APP_VERSION = '6.3.13';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -960,53 +960,28 @@ function onFilesSelected(files) {
 // ===== COMPARTILHAMENTO: recebe fotos compartilhadas de outros apps (Galeria, Google Fotos, etc) =====
 async function verificarFotosCompartilhadas() {
   const params = new URLSearchParams(window.location.search);
-  const marca = params.get('compartilhado');
-  if (!marca) return;
+  if (params.get('compartilhado') !== '1') return;
 
   // Limpa o parâmetro da URL pra não tentar carregar de novo se a página recarregar
   window.history.replaceState({}, '', window.location.pathname);
 
-  // O service worker avisa quando recebeu o compartilhamento mas não veio foto,
-  // ou quando deu erro — aí o app mostra uma mensagem clara em vez de ficar mudo.
-  if (marca === 'erro') {
-    mostrarAvisoCustomizado('Não consegui preparar as fotos compartilhadas. Tente pelo botão "Escolher fotos". 📷', '⚠️');
-    return;
-  }
-  if (marca === 'vazio') {
-    mostrarAvisoCustomizado('Este celular não trouxe as fotos pelo compartilhamento. Toque em "Toque para selecionar as fotos" e escolha da galeria — funciona certinho. 📷', '📷');
-    return;
-  }
-
   try {
     const db = await abrirBancoCompartilhamentoApp();
-
-    // 1) LÊ as fotos (transação própria, só leitura).
+    const tx = db.transaction('fotos', 'readwrite');
+    const store = tx.objectStore('fotos');
     const arquivos = await new Promise((resolve, reject) => {
-      const tx = db.transaction('fotos', 'readonly');
-      const req = tx.objectStore('fotos').getAll();
+      const req = store.getAll();
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
+    await store.clear();
 
-    // 2) CARREGA as fotos ANTES de qualquer outra coisa (essa é a parte que importa).
     if (arquivos && arquivos.length > 0) {
       onFilesSelected(arquivos);
       setSection('sec-upload');
-    } else {
-      mostrarAvisoCustomizado('Recebi o compartilhamento, mas as fotos não vieram junto. Me avise pra eu ajustar. 🤔', '🤔');
     }
-
-    // 3) LIMPA depois, em transação separada e à prova de erro (não pode travar nada).
-    try {
-      await new Promise((resolve) => {
-        const tx = db.transaction('fotos', 'readwrite');
-        tx.objectStore('fotos').clear();
-        tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve;
-      });
-    } catch (e) { /* limpeza é opcional */ }
-    try { db.close(); } catch (e) {}
   } catch (e) {
-    mostrarAvisoCustomizado('Tive um problema ao abrir as fotos compartilhadas. Tente pelo botão "Escolher fotos". 📷', '⚠️');
+    console.log('Nenhuma foto compartilhada encontrada:', e.message);
   }
 }
 
