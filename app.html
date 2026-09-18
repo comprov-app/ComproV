@@ -395,7 +395,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.9</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.10</span></div>
 </div>
 
 <div class="container">
@@ -601,7 +601,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.9';
+const APP_VERSION = '6.3.10';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -960,10 +960,22 @@ function onFilesSelected(files) {
 // ===== COMPARTILHAMENTO: recebe fotos compartilhadas de outros apps (Galeria, Google Fotos, etc) =====
 async function verificarFotosCompartilhadas() {
   const params = new URLSearchParams(window.location.search);
-  if (params.get('compartilhado') !== '1') return;
+  const marca = params.get('compartilhado');
+  if (!marca) return;
 
   // Limpa o parâmetro da URL pra não tentar carregar de novo se a página recarregar
   window.history.replaceState({}, '', window.location.pathname);
+
+  // O service worker avisa quando recebeu o compartilhamento mas não veio foto,
+  // ou quando deu erro — aí o app mostra uma mensagem clara em vez de ficar mudo.
+  if (marca === 'erro') {
+    mostrarAvisoCustomizado('Não consegui preparar as fotos compartilhadas. Tente pelo botão "Escolher fotos". 📷', '⚠️');
+    return;
+  }
+  if (marca === 'vazio') {
+    mostrarAvisoCustomizado('O compartilhamento chegou, mas sem nenhuma foto junto. Selecione as fotos de novo, ou use o botão "Escolher fotos". 📷', '🤔');
+    return;
+  }
 
   try {
     const db = await abrirBancoCompartilhamentoApp();
@@ -977,11 +989,11 @@ async function verificarFotosCompartilhadas() {
     });
 
     // 2) CARREGA as fotos ANTES de qualquer outra coisa (essa é a parte que importa).
-    //    O bug antigo limpava a caixinha na mesma transação e estourava aqui, pulando
-    //    o carregamento. Agora carrega primeiro e só depois limpa.
     if (arquivos && arquivos.length > 0) {
       onFilesSelected(arquivos);
       setSection('sec-upload');
+    } else {
+      mostrarAvisoCustomizado('Recebi o compartilhamento, mas as fotos não vieram junto. Me avise pra eu ajustar. 🤔', '🤔');
     }
 
     // 3) LIMPA depois, em transação separada e à prova de erro (não pode travar nada).
@@ -994,7 +1006,7 @@ async function verificarFotosCompartilhadas() {
     } catch (e) { /* limpeza é opcional */ }
     try { db.close(); } catch (e) {}
   } catch (e) {
-    console.log('Nenhuma foto compartilhada encontrada:', e.message);
+    mostrarAvisoCustomizado('Tive um problema ao abrir as fotos compartilhadas. Tente pelo botão "Escolher fotos". 📷', '⚠️');
   }
 }
 
