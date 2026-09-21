@@ -74,7 +74,8 @@
   .menu-itens { flex: 1; padding: 8px 0 50px 0; overflow-y: auto; }
   .menu-item { display: flex; align-items: center; gap: 14px; padding: 15px 20px; font-size: 15px; color: var(--text-primary); cursor: pointer; border: none; background: transparent; width: 100%; text-align: left; border-bottom: 1px solid var(--border-color, #eee); transition: background .15s; }
   .menu-item:hover { background: var(--tab-bg, #f0f0ec); }
-  .menu-item .ico { font-size: 20px; width: 24px; text-align: center; }
+  .menu-item .ico { width: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-primary); }
+  .menu-item .ico svg { width: 21px; height: 21px; display: block; }
   .menu-item.ativo { background: var(--tab-bg, #f0f0ec); font-weight: 600; }
   .container { max-width: 480px; margin: 0 auto; padding: 16px; }
   .card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--card-border); padding: 16px; margin-bottom: 12px; }
@@ -388,14 +389,14 @@
     <button class="menu-fechar" onclick="fecharMenu()" aria-label="Fechar menu">✕</button>
   </div>
   <div class="menu-itens">
-    <button class="menu-item" onclick="menuIr('enviar')"><span class="ico">📷</span> Enviar</button>
-    <button class="menu-item" onclick="menuIr('coleta')"><span class="ico">📥</span> Coleta de fotos</button>
-    <button class="menu-item" onclick="menuIr('mensagem')"><span class="ico">💬</span> Mensagem</button>
-    <button class="menu-item" onclick="menuIr('plano')"><span class="ico">📦</span> Seu Plano</button>
-    <button class="menu-item" onclick="menuIr('historico')"><span class="ico">🕐</span> Histórico</button>
-    <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico">🌙</span> <span id="menu-tema-txt">Modo noturno</span></button>
+    <button class="menu-item" onclick="menuIr('enviar')"><span class="ico" data-ico="send"></span> Enviar</button>
+    <button class="menu-item" onclick="menuIr('coleta')"><span class="ico" data-ico="inbox"></span> Coleta de fotos</button>
+    <button class="menu-item" onclick="menuIr('mensagem')"><span class="ico" data-ico="chat"></span> Mensagem</button>
+    <button class="menu-item" onclick="menuIr('plano')"><span class="ico" data-ico="pacote"></span> Seu Plano</button>
+    <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
+    <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.14</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.15</span></div>
 </div>
 
 <div class="container">
@@ -579,6 +580,27 @@ let selectedFiles = [];
 function escHtml(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+
+// ===== ÍCONES (SVG de linha, herdam a cor via currentColor — sem depender de internet) =====
+const ICONES = {
+  send:   '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  inbox:  '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  chat:   '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  pacote: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+  relogio:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  lua:    '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  sol:    '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>'
+};
+function svgIcone(nome, tam){
+  const t = tam || 21;
+  return '<svg viewBox="0 0 24 24" width="'+t+'" height="'+t+'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONES[nome]||'')+'</svg>';
+}
+// Preenche todo elemento com [data-ico] com o SVG correspondente.
+function renderIcones(raiz){
+  (raiz || document).querySelectorAll('[data-ico]').forEach(function(el){
+    el.innerHTML = svgIcone(el.getAttribute('data-ico'));
+  });
+}
 let dadosLidos = [];
 
 // ===== CONFIG =====
@@ -601,11 +623,12 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.14';
+const APP_VERSION = '6.3.15';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
   if (el) el.textContent = 'v' + APP_VERSION;
+  renderIcones(); // troca os [data-ico] pelos ícones SVG
 });
 
 async function ativarPorCodigo() {
@@ -857,7 +880,7 @@ function abrirMenu() {
   document.getElementById('menu-overlay').classList.add('aberto');
   // Atualiza o texto do tema no menu
   const temaEscuro = (localStorage.getItem('tema') || 'dark') === 'dark';
-  document.getElementById('menu-tema-ico').textContent = temaEscuro ? '☀️' : '🌙';
+  document.getElementById('menu-tema-ico').innerHTML = svgIcone(temaEscuro ? 'sol' : 'lua');
   document.getElementById('menu-tema-txt').textContent = temaEscuro ? 'Modo claro' : 'Modo noturno';
 }
 function fecharMenu() {
@@ -868,7 +891,7 @@ function menuIr(destino) {
   if (destino === 'tema') {
     toggleTheme();
     const temaEscuro = (localStorage.getItem('tema') || 'dark') === 'dark';
-    document.getElementById('menu-tema-ico').textContent = temaEscuro ? '☀️' : '🌙';
+    document.getElementById('menu-tema-ico').innerHTML = svgIcone(temaEscuro ? 'sol' : 'lua');
     document.getElementById('menu-tema-txt').textContent = temaEscuro ? 'Modo claro' : 'Modo noturno';
     return; // nao fecha o menu, pra ver a mudanca
   }
