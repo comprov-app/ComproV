@@ -276,7 +276,8 @@
     pointer-events: none; display: flex; align-items: center; justify-content: center;
   }
   .color-preview-swatch::after {
-    content: '🎨'; font-size: 20px; opacity: .85;
+    content: ''; width: 22px; height: 22px; opacity: .85;
+    background: center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z'/%3E%3C/svg%3E");
   }
   .tag-hint { display:inline-block; background: var(--tag-bg); border-radius:4px; padding:2px 6px; font-size:11px; color: var(--tag-text); margin:2px; cursor:pointer; border:1px solid var(--tag-border); }
   .tag-hint:hover { filter: brightness(1.2); }
@@ -406,7 +407,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.17</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.18</span></div>
 </div>
 
 <div class="container">
@@ -621,7 +622,8 @@ const ICONES = {
   bloqueado:'<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
   telefone:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
   ajuda:  '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
-  baixar: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>'
+  baixar: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+  zoom:   '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/>'
 };
 function svgIcone(nome, tam){
   const t = tam || 21;
@@ -693,7 +695,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.17';
+const APP_VERSION = '6.3.18';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -1169,7 +1171,7 @@ function abrirFotoResultado(i) {
     overlay.innerHTML = `
       <div class="rec-header">
         <button class="foto-fullscreen-fechar" id="foto-res-fechar">✕</button>
-        <div class="rec-instr">👆 Dê zoom, leia o telefone na foto e digite <b>aqui embaixo</b></div>
+        <div class="rec-instr">${iconeInline('zoom')} Dê zoom, leia o telefone na foto e digite <b>aqui embaixo</b></div>
       </div>
       <div class="rec-foto-area" id="rec-foto-area">
         <img src="${item.previewUrl}" class="rec-foto-img" id="rec-foto-img" />
@@ -1215,7 +1217,7 @@ function abrirFotoResultado(i) {
   if (podeRecuperar) {
     const area = overlay.querySelector('#rec-foto-area');
     const img = overlay.querySelector('#rec-foto-img');
-    let escala = 1, tx = 0, ty = 0, arrastando = false, sx = 0, sy = 0, ultimoTap = 0;
+    let escala = 1, tx = 0, ty = 0, arrastando = false, sx = 0, sy = 0, ultimoTap = 0, ultimoTapX = 0, ultimoTapY = 0;
     let pinchAtivo = false, pinchDist = 0, pinchBase = 1;
     function limites(){ const r = area.getBoundingClientRect(); tx = Math.min(0, Math.max(-r.width*(escala-1), tx)); ty = Math.min(0, Math.max(-r.height*(escala-1), ty)); }
     function aplicar(){ limites(); img.style.transform = 'translate('+tx+'px,'+ty+'px) scale('+escala+')'; }
@@ -1237,12 +1239,16 @@ function abrirFotoResultado(i) {
     area.addEventListener('pointerdown', (e)=>{
       const agora = Date.now();
       const r = area.getBoundingClientRect();
-      if (agora - ultimoTap < 300 && !pinchAtivo) {
+      const px = e.clientX - r.left, py = e.clientY - r.top;
+      // So conta como "toque duplo" (pra dar/tirar zoom) se os 2 toques forem no
+      // MESMO ponto. Assim, tocar em lugares diferentes (pra andar na foto) nao reseta.
+      const pertoDoUltimo = Math.hypot(px - ultimoTapX, py - ultimoTapY) < 40;
+      if (agora - ultimoTap < 300 && pertoDoUltimo && !pinchAtivo) {
         if (escala > 1) zoomPara(1);
-        else zoomPara(2.6, e.clientX - r.left, e.clientY - r.top);
+        else zoomPara(2.6, px, py);
         ultimoTap = 0; return;
       }
-      ultimoTap = agora;
+      ultimoTap = agora; ultimoTapX = px; ultimoTapY = py;
       if (escala <= 1 || pinchAtivo) return;
       arrastando = true; sx = e.clientX - tx; sy = e.clientY - ty;
       try { area.setPointerCapture(e.pointerId); } catch(err){}
@@ -3235,7 +3241,7 @@ async function abrirFotoHistorico(idx) {
   // ===== Zoom e arraste (mesma lógica da tela de recuperação) =====
   const area = overlay.querySelector('#hist-foto-area');
   const img = overlay.querySelector('#hist-foto-img');
-  let escala = 1, tx = 0, ty = 0, arrastando = false, sx = 0, sy = 0, ultimoTap = 0;
+  let escala = 1, tx = 0, ty = 0, arrastando = false, sx = 0, sy = 0, ultimoTap = 0, ultimoTapX = 0, ultimoTapY = 0;
   let pinchAtivo = false, pinchDist = 0, pinchBase = 1;
   function limites(){ const r = area.getBoundingClientRect(); tx = Math.min(0, Math.max(-r.width*(escala-1), tx)); ty = Math.min(0, Math.max(-r.height*(escala-1), ty)); }
   function aplicar(){ limites(); img.style.transform = 'translate('+tx+'px,'+ty+'px) scale('+escala+')'; }
@@ -3255,11 +3261,14 @@ async function abrirFotoHistorico(idx) {
   area.addEventListener('pointerdown', (e)=>{
     const agora = Date.now();
     const r = area.getBoundingClientRect();
-    if (agora - ultimoTap < 300 && !pinchAtivo) {
-      if (escala > 1) zoomPara(1); else zoomPara(2.6, e.clientX - r.left, e.clientY - r.top);
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    // So conta "toque duplo" (zoom) se os 2 toques forem no MESMO ponto (nao reseta ao andar).
+    const pertoDoUltimo = Math.hypot(px - ultimoTapX, py - ultimoTapY) < 40;
+    if (agora - ultimoTap < 300 && pertoDoUltimo && !pinchAtivo) {
+      if (escala > 1) zoomPara(1); else zoomPara(2.6, px, py);
       ultimoTap = 0; return;
     }
-    ultimoTap = agora;
+    ultimoTap = agora; ultimoTapX = px; ultimoTapY = py;
     if (escala <= 1 || pinchAtivo) return;
     arrastando = true; sx = e.clientX - tx; sy = e.clientY - ty;
     try { area.setPointerCapture(e.pointerId); } catch(err){}
