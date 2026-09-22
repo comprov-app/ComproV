@@ -407,7 +407,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.19</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.20</span></div>
 </div>
 
 <div class="container">
@@ -695,7 +695,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.19';
+const APP_VERSION = '6.3.20';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -1501,13 +1501,15 @@ function gerarMiniaturaFila(file, index, itemRef) {
       // com zoom. Feita a partir da MESMA imagem já decodificada (custo baixo).
       if (itemRef) {
         try {
-          const MAX_HIST = 800; // grande o bastante pra ler o telefone na etiqueta, e ainda leve
+          const MAX_HIST = 1280; // resolução maior: dá pra ler a etiqueta com nitidez no zoom
           const escH = Math.min(1, MAX_HIST / Math.max(img.width, img.height));
           const cH = document.createElement('canvas');
           cH.width = Math.round(img.width * escH);
           cH.height = Math.round(img.height * escH);
-          cH.getContext('2d').drawImage(img, 0, 0, cH.width, cH.height);
-          itemRef.fotoMedia = cH.toDataURL('image/jpeg', 0.6);
+          const ctxH = cH.getContext('2d');
+          ctxH.imageSmoothingQuality = 'high';
+          ctxH.drawImage(img, 0, 0, cH.width, cH.height);
+          itemRef.fotoMedia = cH.toDataURL('image/jpeg', 0.75);
         } catch (e) { /* se falhar, o item simplesmente não terá foto no histórico */ }
       }
       URL.revokeObjectURL(url); // Libera a foto original da memória imediatamente
