@@ -76,6 +76,16 @@
   .menu-item:hover { background: var(--tab-bg, #f0f0ec); }
   .menu-item .ico { width: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-primary); }
   .menu-item .ico svg { width: 21px; height: 21px; display: block; }
+  /* Ícones inline (dentro de botões e títulos): acompanham a cor e o tamanho do texto */
+  .ico-i { display: inline-flex; align-items: center; vertical-align: -0.16em; line-height: 0; }
+  .ico-i svg { width: 1.15em; height: 1.15em; }
+  .ico-g svg { width: 44px; height: 44px; }
+  .sec-ico svg { width: 16px; height: 16px; }
+  .success-icon { color: #155724; }
+  .success-icon svg { width: 34px; height: 34px; }
+  .upload-area .icon { color: var(--text-secondary, #8b9096); }
+  .girando { animation: girar .9s linear infinite; }
+  @keyframes girar { to { transform: rotate(360deg); } }
   .menu-item.ativo { background: var(--tab-bg, #f0f0ec); font-weight: 600; }
   .container { max-width: 480px; margin: 0 auto; padding: 16px; }
   .card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--card-border); padding: 16px; margin-bottom: 12px; }
@@ -396,7 +406,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.15</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.16</span></div>
 </div>
 
 <div class="container">
@@ -404,7 +414,7 @@
   <!-- ========== COLETA DE FOTOS ========== -->
   <div class="section" id="sec-coleta">
     <div class="card">
-      <div class="card-title">📥 Coleta de fotos</div>
+      <div class="card-title"><span class="ico-i" data-ico="inbox"></span> Coleta de fotos</div>
       <p style="font-size:13px; color:#888; margin:-4px 0 14px;">Um colaborador pode enviar as fotos das etiquetas por um link, sem acessar o app. As fotos chegam aqui, prontas pra você enviar.</p>
 
       <div style="font-size:12px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:#999;">Seu link de coleta</div>
@@ -412,40 +422,40 @@
         <input id="coleta-link" readonly value="Gerando…" style="flex:1; min-width:0; padding:11px 12px; border:1px solid var(--border-color,#ddd); border-radius:10px; background:var(--tab-bg,#f5f5f0); color:var(--text-primary); font-size:13px;">
         <button class="btn btn-green" id="coleta-copiar" onclick="copiarLinkColeta()" style="width:auto; margin:0; padding:11px 16px;">Copiar</button>
       </div>
-      <p style="font-size:12.5px; color:#888; margin-top:9px; line-height:1.5;">📤 Passe este link pro seu colaborador. As fotos que ele mandar aparecem aqui embaixo. Se um colaborador sair, gere um link novo e o antigo para de funcionar.</p>
-      <button class="btn" id="coleta-renovar" onclick="renovarLinkColeta()" style="background:transparent; border:1.5px solid var(--border-color,#ccc); color:var(--text-primary); margin-top:6px;">🔄 Gerar link novo</button>
+      <p style="font-size:12.5px; color:#888; margin-top:9px; line-height:1.5;"><span class="ico-i" data-ico="link"></span> Passe este link pro seu colaborador. As fotos que ele mandar aparecem aqui embaixo. Se um colaborador sair, gere um link novo e o antigo para de funcionar.</p>
+      <button class="btn" id="coleta-renovar" onclick="renovarLinkColeta()" style="background:transparent; border:1.5px solid var(--border-color,#ccc); color:var(--text-primary); margin-top:6px;"><span class="ico-i" data-ico="atualizar"></span> Gerar link novo</button>
     </div>
 
     <div class="card">
       <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
-        <span id="coleta-fotos-tit">📷 Fotos recebidas</span>
+        <span id="coleta-fotos-tit"><span class="ico-i" data-ico="imagem"></span> Fotos recebidas</span>
         <button onclick="carregarColeta()" style="background:transparent; border:none; color:var(--text-primary); font-size:13px; font-weight:700; cursor:pointer;">Atualizar</button>
       </div>
       <div id="coleta-status" class="alert alert-warn" style="display:none; margin-bottom:12px;"></div>
       <div class="thumb-grid" id="coleta-grid"></div>
       <div id="coleta-vazio" style="text-align:center; color:#999; padding:26px 10px; font-size:14px;">Nenhuma foto recebida ainda.<br>Assim que o colaborador enviar, aparece aqui.</div>
     </div>
-    <button class="btn btn-green" id="coleta-enviar-todas" onclick="enviarTodasColeta()" style="display:none;">📲 Enviar todas</button>
-    <button class="btn btn-gray" id="coleta-limpar-todas" onclick="limparTodasColeta()" style="display:none; margin-top:8px;">🗑️ Limpar todas</button>
+    <button class="btn btn-green" id="coleta-enviar-todas" onclick="enviarTodasColeta()" style="display:none;"><span class="ico-i" data-ico="send"></span> Enviar todas</button>
+    <button class="btn btn-gray" id="coleta-limpar-todas" onclick="limparTodasColeta()" style="display:none; margin-top:8px;"><span class="ico-i" data-ico="lixeira"></span> Limpar todas</button>
   </div>
 
   <!-- ========== PAINEL ========== -->
   <div class="section" id="sec-painel">
     <div class="nav-tabs" style="display:none">
-      <button class="nav-tab active" id="btn-tab-apis" onclick="showTab('tab-apis', this)">🔑 APIs</button>
-      <button class="nav-tab" onclick="showTab('tab-mensagem', this)">💬 Mensagem</button>
-      <button class="nav-tab" onclick="showTab('tab-plano', this)">📦 Plano</button>
+      <button class="nav-tab active" id="btn-tab-apis" onclick="showTab('tab-apis', this)"><span class="ico-i" data-ico="chave"></span> APIs</button>
+      <button class="nav-tab" onclick="showTab('tab-mensagem', this)"><span class="ico-i" data-ico="chat"></span> Mensagem</button>
+      <button class="nav-tab" onclick="showTab('tab-plano', this)"><span class="ico-i" data-ico="pacote"></span> Plano</button>
     </div>
 
     <!-- ABA APIs (ATIVAÇÃO POR CÓDIGO) -->
     <div id="tab-apis">
       <div class="card">
-        <div class="card-title">🔑 Ativar minha loja</div>
+        <div class="card-title"><span class="ico-i" data-ico="chave"></span> Ativar minha loja</div>
         <label>Código de acesso <span class="label-hint">Digite o código que você recebeu</span></label>
         <input type="text" id="codigo-acesso" placeholder="Ex: LOJA1234" autocomplete="off" data-lpignore="true" data-1p-ignore style="text-transform:uppercase" />
         <div id="codigo-status" style="margin-top:10px; font-size:14px;"></div>
       </div>
-      <button class="btn btn-green" id="btn-ativar" onclick="ativarPorCodigo()">🔓 Ativar</button>
+      <button class="btn btn-green" id="btn-ativar" onclick="ativarPorCodigo()"><span class="ico-i" data-ico="cadeado"></span> Ativar</button>
 
       <!-- Contato WhatsApp: ajuda o cliente atual e quem ainda não tem código -->
       <div class="whats-ajuda">Precisa de ajuda ou ainda não tem um código?</div>
@@ -469,12 +479,12 @@
 
       <div class="sec-card">
         <div class="sec-head">
-          <span class="sec-ico">💬</span>
+          <span class="sec-ico" data-ico="chat"></span>
           <span class="sec-titulo">Texto da mensagem</span>
         </div>
         <div class="sec-desc">Toque na variável para inserir no texto</div>
         <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;">
-          <span class="tag-hint" onclick="inserirTag('{nome}')">👤 {nome}</span>
+          <span class="tag-hint" onclick="inserirTag('{nome}')"><span class="ico-i" data-ico="usuario"></span> {nome}</span>
         </div>
         <textarea id="msg-template" placeholder="Digite sua mensagem..."></textarea>
         <div class="preview-label">PRÉVIA</div>
@@ -485,8 +495,8 @@
       </div>
 
       <div class="btn-dupla">
-        <button class="btn btn-green" onclick="saveConfig()">💾 Salvar</button>
-        <button class="btn btn-gray" onclick="resetMensagem()">↩️ Padrão</button>
+        <button class="btn btn-green" onclick="saveConfig()"><span class="ico-i" data-ico="salvar"></span> Salvar</button>
+        <button class="btn btn-gray" onclick="resetMensagem()"><span class="ico-i" data-ico="voltar"></span> Padrão</button>
       </div>
 
     </div>
@@ -515,9 +525,9 @@
   <!-- ========== UPLOAD ========== -->
   <div class="section active" id="sec-upload">
     <div class="card">
-      <div class="card-title">📸 Selecionar fotos</div>
+      <div class="card-title"><span class="ico-i" data-ico="camera"></span> Selecionar fotos</div>
       <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
-        <div class="icon">📸</div>
+        <div class="icon ico-g" data-ico="camera"></div>
         <p>Toque para selecionar as fotos</p>
         <span>Pode selecionar várias de uma vez, ou arrastar para aqui</span>
       </div>
@@ -525,16 +535,16 @@
       <div class="thumb-grid" id="thumb-grid"></div>
       <div class="alert alert-warn" id="aviso-intervalo" style="display:none; margin-top:12px;"></div>
     </div>
-    <button class="btn btn-green" id="btn-send" onclick="startProcessingServidor()" disabled>📲 Ler e enviar comprovantes</button>
+    <button class="btn btn-green" id="btn-send" onclick="startProcessingServidor()" disabled><span class="ico-i" data-ico="send"></span> Ler e enviar comprovantes</button>
   </div>
 
   <!-- ========== PROCESSANDO ========== -->
   <div class="section" id="sec-processing">
     <div id="aviso-segundo-plano" class="alert alert-warn" style="display:none; margin-bottom:12px;">
-      ⏸️ <b>O app foi pra segundo plano!</b> O envio pode pausar enquanto você estiver em outro aplicativo. Volte pra esta tela para garantir que continue enviando.
+      <span class="ico-i" data-ico="pausa"></span> <b>O app foi pra segundo plano!</b> O envio pode pausar enquanto você estiver em outro aplicativo. Volte pra esta tela para garantir que continue enviando.
     </div>
     <div class="card">
-      <div class="card-title">📤 Enviando comprovantes...</div>
+      <div class="card-title"><span class="ico-i" data-ico="send"></span> Enviando comprovantes...</div>
       <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
       <div class="progress-label">
         <span id="prog-text">Iniciando...</span>
@@ -547,7 +557,7 @@
   <!-- ========== CONCLUÍDO ========== -->
   <div class="section" id="sec-done">
     <div class="card" style="text-align:center; padding:24px 16px;">
-      <div class="success-icon">✅</div>
+      <div class="success-icon ico-g" data-ico="check"></div>
       <p style="font-size:17px; font-weight:700; color:var(--text-primary);">Lote concluído!</p>
       <p style="font-size:13px; color:#888; margin-top:4px;">Comprovantes enviados com foto no WhatsApp</p>
     </div>
@@ -557,15 +567,15 @@
       <div class="summary-box"><div class="num" id="s-err" style="color:#dc3545">0</div><div class="lbl">Erros</div></div>
     </div>
     <div class="card" id="done-list"></div>
-    <button class="btn btn-green" onclick="resetApp()">📸 Novo lote</button>
+    <button class="btn btn-green" onclick="resetApp()"><span class="ico-i" data-ico="camera"></span> Novo lote</button>
   </div>
 
   <!-- ========== HISTÓRICO ========== -->
   <div class="section" id="sec-historico">
-    <div class="card-title" style="margin-bottom:12px;">📋 Histórico de lotes enviados</div>
+    <div class="card-title" style="margin-bottom:12px;"><span class="ico-i" data-ico="lista"></span> Histórico de lotes enviados</div>
     <div id="historico-lista"></div>
-    <button class="btn btn-gray" onclick="limparHistorico()" style="margin-top:8px">🗑️ Limpar histórico</button>
-    <button class="btn btn-gray" onclick="setSection('sec-upload')" style="margin-top:8px">📸 Voltar a enviar</button>
+    <button class="btn btn-gray" onclick="limparHistorico()" style="margin-top:8px"><span class="ico-i" data-ico="lixeira"></span> Limpar histórico</button>
+    <button class="btn btn-gray" onclick="setSection('sec-upload')" style="margin-top:8px"><span class="ico-i" data-ico="seta_esq"></span> Voltar a enviar</button>
   </div>
 
 </div>
@@ -589,12 +599,31 @@ const ICONES = {
   pacote: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
   relogio:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
   lua:    '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
-  sol:    '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>'
+  sol:    '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  imagem: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
+  chave:  '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
+  cadeado:'<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  salvar: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
+  voltar: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+  seta_esq:'<line x1="19" x2="5" y1="12" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+  lista:  '<line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>',
+  lixeira:'<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+  link:   '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  calendario:'<rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>',
+  check:  '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  pausa:  '<circle cx="12" cy="12" r="10"/><line x1="10" x2="10" y1="15" y2="9"/><line x1="14" x2="14" y1="15" y2="9"/>',
+  usuario:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  atualizar:'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  carregando:'<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  mail:   '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>'
 };
 function svgIcone(nome, tam){
   const t = tam || 21;
   return '<svg viewBox="0 0 24 24" width="'+t+'" height="'+t+'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONES[nome]||'')+'</svg>';
 }
+// Ícone inline pronto pra usar dentro de textos montados no código (innerHTML).
+function iconeInline(nome){ return '<span class="ico-i">'+svgIcone(nome)+'</span>'; }
 // Preenche todo elemento com [data-ico] com o SVG correspondente.
 function renderIcones(raiz){
   (raiz || document).querySelectorAll('[data-ico]').forEach(function(el){
@@ -623,7 +652,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.15';
+const APP_VERSION = '6.3.16';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -644,7 +673,7 @@ async function ativarPorCodigo() {
 
   btn.disabled = true;
   const textoOriginal = btn.innerHTML;
-  btn.innerHTML = '⏳ Ativando...';
+  btn.innerHTML = '<span class="ico-i girando">'+svgIcone('carregando')+'</span> Ativando...';
   status.innerHTML = '<span style="color:#888">Verificando o código...</span>';
 
   try {
@@ -691,7 +720,7 @@ async function ativarPorCodigo() {
 
     limparErroDeApi();
     atualizarVisibilidadeAbaApis();
-    status.innerHTML = '<span style="color:#1e8449">✅ Loja ativada com sucesso!</span>';
+    status.innerHTML = '<span style="color:#1e8449">'+iconeInline('check')+' Loja ativada com sucesso!</span>';
 
     const nome = cfg.nome_loja ? ` (${cfg.nome_loja})` : '';
     setTimeout(() => {
@@ -1366,7 +1395,7 @@ function atualizarAvisoIntervalo() {
   const tempoTexto = minutos > 0 ? `${minutos}min ${segs}s` : `${segs}s`;
 
   aviso.style.display = 'block';
-  aviso.innerHTML = `⏱️ <b>${qtd} etiqueta${qtd > 1 ? 's' : ''}</b> selecionada${qtd > 1 ? 's' : ''} · intervalo de <b>${segundos}s</b> entre envios · tempo estimado: <b>${tempoTexto}</b>`;
+  aviso.innerHTML = iconeInline('relogio') + ` <b>${qtd} etiqueta${qtd > 1 ? 's' : ''}</b> selecionada${qtd > 1 ? 's' : ''} · intervalo de <b>${segundos}s</b> entre envios · tempo estimado: <b>${tempoTexto}</b>`;
 }
 
 // ===== PROCESSAMENTO =====
@@ -1875,7 +1904,7 @@ function atualizarResumoUsoMensal() {
   if (cicloTagEl) {
     const diaCiclo = obterDiaCiclo();
     const proximaRenovacao = calcularProximaRenovacao(diaCiclo);
-    cicloTagEl.innerHTML = `📅 ${proximaRenovacao}`;
+    cicloTagEl.innerHTML = iconeInline('calendario') + ' ' + proximaRenovacao;
   }
 
   // Linha de renovação: normalmente mostra só "Renova dia X". Quando falta pouco
@@ -1887,19 +1916,19 @@ function atualizarResumoUsoMensal() {
     const dias = calcularDiasAteRenovacao(diaCiclo);
     let texto, classe = '';
     if (dias <= 0) {
-      texto = `🔄 Renova dia ${diaCiclo} · renova hoje`;
+      texto = iconeInline('atualizar') + ` Renova dia ${diaCiclo} · renova hoje`;
       classe = 'perto';
     } else if (dias === 1) {
-      texto = `🔄 Renova dia ${diaCiclo} · falta 1 dia`;
+      texto = iconeInline('atualizar') + ` Renova dia ${diaCiclo} · falta 1 dia`;
       classe = 'perto';
     } else if (dias <= 3) {
-      texto = `🔄 Renova dia ${diaCiclo} · faltam ${dias} dias`;
+      texto = iconeInline('atualizar') + ` Renova dia ${diaCiclo} · faltam ${dias} dias`;
       classe = 'perto';
     } else {
       // Longe da renovação: mostra só o dia, sem contagem de dias
-      texto = `🔄 Renova dia ${diaCiclo}`;
+      texto = iconeInline('atualizar') + ` Renova dia ${diaCiclo}`;
     }
-    renovEl.textContent = texto;
+    renovEl.innerHTML = texto;
     renovEl.className = 'plano-renovacao' + (classe ? ' ' + classe : '');
   }
 }
@@ -2395,7 +2424,7 @@ function mostrarColetaToast(qtd){
     document.body.appendChild(t);
   }
   const frase = qtd === 1 ? 'Chegou 1 foto nova na coleta!' : 'Chegaram ' + qtd + ' fotos novas na coleta!';
-  t.innerHTML = '<span class="ct-ic">📥</span><span class="ct-txt">' + frase + '<small>Toque para ver e enviar</small></span>';
+  t.innerHTML = '<span class="ct-ic">'+svgIcone('inbox',24)+'</span><span class="ct-txt">' + frase + '<small>Toque para ver e enviar</small></span>';
   setTimeout(function(){ t.classList.add('mostra'); }, 40);
   clearTimeout(coletaToastTimer);
   coletaToastTimer = setTimeout(esconderColetaToast, 7000);
@@ -2478,15 +2507,15 @@ function atualizarUIColeta(){
     vazio.style.display = 'block';
     btnTodas.style.display = 'none';
     if(btnLimpar) btnLimpar.style.display = 'none';
-    tit.textContent = '📷 Fotos recebidas';
+    tit.innerHTML = iconeInline('imagem') + ' Fotos recebidas';
   } else {
     vazio.style.display = 'none';
-    tit.textContent = `📷 Fotos recebidas (${coletaFotos.length})`;
+    tit.innerHTML = iconeInline('imagem') + ` Fotos recebidas (${coletaFotos.length})`;
     btnTodas.style.display = coletaEnviando ? 'none' : 'block';
-    btnTodas.textContent = `📲 Enviar todas (${coletaFotos.length})`;
+    btnTodas.innerHTML = iconeInline('send') + ` Enviar todas (${coletaFotos.length})`;
     if(btnLimpar){
       btnLimpar.style.display = coletaEnviando ? 'none' : 'block';
-      btnLimpar.textContent = `🗑️ Limpar todas (${coletaFotos.length})`;
+      btnLimpar.innerHTML = iconeInline('lixeira') + ` Limpar todas (${coletaFotos.length})`;
     }
   }
 }
@@ -2579,7 +2608,7 @@ async function enviarTodasColeta(){
   coletaEnviando = true;
   const codigo = localStorage.getItem('codigo_acesso');
   const btn = document.getElementById('coleta-enviar-todas');
-  const rotulo = `📲 Enviar todas (${coletaFotos.length})`;
+  const rotulo = iconeInline('send') + ` Enviar todas (${coletaFotos.length})`;
   if(btn){ btn.disabled = true; btn.textContent = 'Preparando…'; }
   try {
     const arquivos = [];
@@ -2597,14 +2626,14 @@ async function enviarTodasColeta(){
       } catch(e){ /* pula essa e segue */ }
     }
     coletaEnviando = false;
-    if(btn){ btn.disabled = false; btn.textContent = rotulo; }
+    if(btn){ btn.disabled = false; btn.innerHTML = rotulo; }
     if(!arquivos.length){ coletaStatus('⚠️ Não consegui carregar as fotos. Toque em Atualizar e tente de novo.'); return; }
     // Vai pela pagina principal (fila do servidor + reenvio com foto).
     selectedFiles = arquivos;
     await startProcessingServidor();
   } catch(e){
     coletaEnviando = false;
-    if(btn){ btn.disabled = false; btn.textContent = rotulo; }
+    if(btn){ btn.disabled = false; btn.innerHTML = rotulo; }
     coletaStatus('⚠️ ' + (e.message || 'Erro ao preparar o envio.'));
   }
 }
@@ -2792,7 +2821,7 @@ function showDone(ok, err) {
     } else {
       // Etiqueta que falhou: convida a tocar na foto pra ver a etiqueta grande
       // e digitar o telefone olhando pra ela.
-      status = `<button class="btn-share" onclick="abrirFotoResultado(${i})">📷 Ver foto e digitar telefone</button>`;
+      status = `<button class="btn-share" onclick="abrirFotoResultado(${i})">${iconeInline('camera')} Ver foto e digitar telefone</button>`;
     }
     return `
     <div class="item-row" id="recuperar-${i}">
@@ -3047,7 +3076,7 @@ function renderCalendarioHistorico() {
       <button class="cal-nav" onclick="mudarMesHistorico(1)">›</button>
     </div>
     <div class="cal-grade">${celulas}</div>
-    <div class="cal-total">📨 Total do mês: <b>${totalMes}</b> ${totalMes === 1 ? 'envio' : 'envios'}</div>
+    <div class="cal-total">${iconeInline('mail')} Total do mês: <b>${totalMes}</b> ${totalMes === 1 ? 'envio' : 'envios'}</div>
     <div class="cal-legenda">Toque num dia destacado para ver os envios.</div>
     <div id="cal-detalhe-dia"></div>
   `;
@@ -3082,7 +3111,7 @@ function mostrarDiaHistorico(chave) {
 
   det.innerHTML = `
     <div class="card" style="margin-top:14px;">
-      <div class="card-title" style="font-size:14px; margin-bottom:4px;">📅 ${dataFmt}</div>
+      <div class="card-title" style="font-size:14px; margin-bottom:4px;">${iconeInline('calendario')} ${dataFmt}</div>
       <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">
         <b style="color:var(--text-primary)">${dados.enviados}</b> envios${dados.erros > 0 ? ` · ${dados.erros} erro(s)` : ''}${dados.lotes.length > 1 ? ` · ${dados.lotes.length} lotes` : ''}${valorTaxas > 0 ? ` · R$ ${valorTaxas.toFixed(2)} em taxas` : ''}
       </div>
@@ -3123,7 +3152,7 @@ function filtrarDiaHistorico() {
     const temFoto = !!it.fotoId;
     // Se tem foto guardada, a linha inteira abre a foto ao tocar (com um 📷 de dica).
     const clique = temFoto ? ` onclick="abrirFotoHistorico(${idx})" style="padding:6px 0; cursor:pointer;"` : ` style="padding:6px 0;"`;
-    const cam = temFoto ? `<span style="font-size:15px; flex-shrink:0;" title="Ver foto">📷</span>` : '';
+    const cam = temFoto ? `<span class="ico-i" style="flex-shrink:0;" title="Ver foto">${svgIcone('camera')}</span>` : '';
     return `
     <div class="item-row"${clique}>
       ${cam}
@@ -3389,7 +3418,7 @@ function mostrarAvisoAtualizacao(reg) {
   banner.id = 'update-banner';
   banner.className = 'update-banner';
   banner.innerHTML = `
-    <span>🆕 Nova versão do app disponível!</span>
+    <span><span class="ico-i" data-ico="atualizar"></span> Nova versão do app disponível!</span>
     <button class="update-btn" id="update-btn">Atualizar agora</button>
   `;
   document.body.appendChild(banner);
@@ -3398,7 +3427,7 @@ function mostrarAvisoAtualizacao(reg) {
   document.getElementById('update-btn').addEventListener('click', () => {
     const worker = reg.waiting || reg.installing;
     if (worker) worker.postMessage('SKIP_WAITING');
-    banner.querySelector('span').textContent = '🔄 Atualizando...';
+    banner.querySelector('span').innerHTML = '<span class="ico-i girando">'+svgIcone('carregando')+'</span> Atualizando...';
     document.getElementById('update-btn').style.display = 'none';
   });
 }
