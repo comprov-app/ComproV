@@ -407,7 +407,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.18</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.19</span></div>
 </div>
 
 <div class="container">
@@ -695,7 +695,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.18';
+const APP_VERSION = '6.3.19';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -1568,6 +1568,20 @@ function mascararTelefone(tel) {
   if (!d) return '';
   if (d.length <= 4) return '••••';
   return '••••-' + d.slice(-4);
+}
+
+// Só os dígitos do telefone, já sem o 55 do país (pra buscar e formatar).
+function digitosTelefone(tel) {
+  let d = String(tel == null ? '' : tel).replace(/\D/g, '');
+  if (d.length > 11 && d.slice(0, 2) === '55') d = d.slice(2);
+  return d;
+}
+// Formata o telefone bonitinho pra exibir: (73) 9 8763-3213 (celular) ou (73) 8763-3213 (fixo).
+function formatarTelefone(tel) {
+  const d = digitosTelefone(tel);
+  if (d.length === 11) return '(' + d.slice(0,2) + ') ' + d.slice(2,3) + ' ' + d.slice(3,7) + '-' + d.slice(7);
+  if (d.length === 10) return '(' + d.slice(0,2) + ') ' + d.slice(2,6) + '-' + d.slice(6);
+  return tel == null ? '' : String(tel); // formato inesperado: mostra como veio
 }
 
 function updateItem(i, nome, detail, badge, badgeClass) {
@@ -3185,7 +3199,7 @@ function filtrarDiaHistorico() {
     .filter(({ it }) => {
       if (!termo) return true;
       const casaNome = (it.nome || '').toLowerCase().includes(termo);
-      const telDigitos = (it.telefone || '').replace(/\D/g, '');
+      const telDigitos = digitosTelefone(it.telefone);
       const casaTel = termoDigitos.length > 0 && telDigitos.includes(termoDigitos);
       return casaNome || casaTel;
     });
@@ -3205,7 +3219,7 @@ function filtrarDiaHistorico() {
       ${cam}
       <div class="item-info">
         <div class="name" style="font-size:12px;">${escHtml(it.nome || '?')}</div>
-        <div class="detail">${escHtml(it.telefone || '')}${it.taxa ? ` · R$ ${parseFloat(it.taxa).toFixed(2)}` : ''}</div>
+        <div class="detail">${escHtml(formatarTelefone(it.telefone))}${it.taxa ? ` · R$ ${parseFloat(it.taxa).toFixed(2)}` : ''}</div>
       </div>
       <span class="badge ${it.sucesso ? 'badge-ok' : 'badge-err'}" style="font-size:10px;">${it.sucesso ? 'Enviado' : 'Erro'}</span>
     </div>`;
@@ -3219,7 +3233,7 @@ async function abrirFotoHistorico(idx) {
   const dataUrl = await lerFotoHist(it.fotoId);
   if (!dataUrl) { mostrarAvisoCustomizado('Foto não disponível para este envio.', '📷'); return; }
 
-  const legenda = `${escHtml(it.nome || '')}${it.telefone ? ' · ' + escHtml(it.telefone) : ''}`;
+  const legenda = `${escHtml(it.nome || '')}${it.telefone ? ' · ' + escHtml(formatarTelefone(it.telefone)) : ''}`;
   const overlay = document.createElement('div');
   overlay.className = 'foto-fullscreen-overlay reenvio';
   overlay.innerHTML = `
