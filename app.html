@@ -407,7 +407,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.21</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.22</span></div>
 </div>
 
 <div class="container">
@@ -695,7 +695,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.21';
+const APP_VERSION = '6.3.22';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -1154,10 +1154,14 @@ function abrirFotoEmTelaCheia(index) {
 // telefone e digitar ali mesmo, olhando pra etiqueta, e enviar sem sair.
 function abrirFotoResultado(i) {
   const item = dadosLidos[i];
-  if (!item || !item.previewUrl) {
-    mostrarAvisoCustomizado('Foto não disponível.', '⚠️');
-    return;
-  }
+  if (!item) { mostrarAvisoCustomizado('Foto não disponível.', '⚠️'); return; }
+  // Fonte da foto à PROVA DE FALHA: cria uma URL nova a partir do arquivo (o link
+  // "blob" antigo pode ter morrido se o app foi pra segundo plano no iPhone); se não
+  // der, usa a versão salva (fotoMedia) ou o previewUrl. Assim a foto SEMPRE aparece.
+  let fotoSrc = '', urlCriada = null;
+  if (item.file) { try { fotoSrc = urlCriada = URL.createObjectURL(item.file); } catch(e){} }
+  if (!fotoSrc) fotoSrc = item.fotoMedia || item.previewUrl || '';
+  if (!fotoSrc) { mostrarAvisoCustomizado('Foto não disponível.', '⚠️'); return; }
 
   // Se o envio falhou, abre a tela de RECUPERAÇÃO: foto grande com zoom (pra ler o
   // telefone na etiqueta) em cima, e o campo de telefone FIXO embaixo. Assim a foto
@@ -1174,7 +1178,7 @@ function abrirFotoResultado(i) {
         <div class="rec-instr">${iconeInline('zoom')} Dê zoom, leia o telefone na foto e digite <b>aqui embaixo</b></div>
       </div>
       <div class="rec-foto-area" id="rec-foto-area">
-        <img src="${item.previewUrl}" class="rec-foto-img" id="rec-foto-img" />
+        <img src="${fotoSrc}" class="rec-foto-img" id="rec-foto-img" />
         <div class="rec-zoom-ctrl">
           <button id="rec-zmais" type="button">+</button>
           <button id="rec-zmenos" type="button">−</button>
@@ -1188,7 +1192,7 @@ function abrirFotoResultado(i) {
   } else {
     overlay.innerHTML = `
       <button class="foto-fullscreen-fechar" id="foto-res-fechar">✕</button>
-      <img src="${item.previewUrl}" class="foto-fullscreen-img" />`;
+      <img src="${fotoSrc}" class="foto-fullscreen-img" />`;
   }
   document.body.appendChild(overlay);
 
@@ -1204,6 +1208,7 @@ function abrirFotoResultado(i) {
 
   function fechar() {
     if (vvHandler && window.visualViewport) window.visualViewport.removeEventListener('resize', vvHandler);
+    if (urlCriada) { try { URL.revokeObjectURL(urlCriada); } catch(e){} }
     overlay.remove();
   }
   overlay.querySelector('#foto-res-fechar').addEventListener('click', fechar);
