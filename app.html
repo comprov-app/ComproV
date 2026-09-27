@@ -137,6 +137,9 @@
 
   /* Card de plano repaginado */
   .plano-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; padding: 22px 20px; }
+  .plano-loja { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; }
+  .plano-loja b { color: var(--text-primary); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .plano-loja-cod { font-size: 11px; font-weight: 700; letter-spacing: .06em; background: var(--tab-bg, #f0f0ec); border: 1px solid var(--card-border, #e8e8e4); border-radius: 6px; padding: 2px 7px; color: var(--text-secondary); flex-shrink: 0; }
   .plano-card-topo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
   .plano-badge { display: inline-flex; align-items: center; gap: 7px; background: #000; color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 15px; font-weight: 700; letter-spacing: .01em; }
   .plano-badge .pico { width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; }
@@ -407,7 +410,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.22</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.23</span></div>
 </div>
 
 <div class="container">
@@ -504,6 +507,7 @@
 
     <div id="tab-plano" style="display:none">
       <div class="plano-card">
+        <div class="plano-loja" id="plano-loja" style="display:none;"></div>
         <div class="plano-card-topo">
           <span class="plano-badge"><span class="pico"></span><span id="plano-nome-badge">—</span></span>
           <div class="plano-ciclo-tag" id="plano-ciclo-tag"></div>
@@ -623,7 +627,8 @@ const ICONES = {
   telefone:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
   ajuda:  '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   baixar: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
-  zoom:   '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/>'
+  zoom:   '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/>',
+  loja:   '<path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2 2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/>'
 };
 function svgIcone(nome, tam){
   const t = tam || 21;
@@ -695,7 +700,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.22';
+const APP_VERSION = '6.3.23';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -755,6 +760,7 @@ async function ativarPorCodigo() {
     }
     // Se o admin pediu um reset do contador (ex: zerar envios de teste da ativação), aplica agora
     if (cfg.plano) localStorage.setItem('plano_nome', cfg.plano);
+    if (cfg.nome_loja) localStorage.setItem('nome_loja', cfg.nome_loja);
     processarResetRemoto(cfg);
 
     // Atualiza os campos ocultos não-secretos
@@ -815,6 +821,7 @@ async function sincronizarConfig() {
     }
     // Se o admin pediu um reset do contador desde a última sincronização, aplica agora
     if (cfg.plano) localStorage.setItem('plano_nome', cfg.plano);
+    if (cfg.nome_loja) localStorage.setItem('nome_loja', cfg.nome_loja);
     processarResetRemoto(cfg);
     // Puxa o uso real do servidor (contador central) e atualiza o espelho local.
     // Assim, se o cliente usou em outro aparelho, este já reflete o número verdadeiro.
@@ -1937,6 +1944,20 @@ function atualizarResumoUsoMensal() {
   const codigoPlano = localStorage.getItem('plano_nome') || '';
   const badgeEl = document.getElementById('plano-nome-badge');
   if (badgeEl) badgeEl.textContent = NOMES_PLANO[codigoPlano] || 'Meu plano';
+
+  // Indicador de QUAL loja está ativa (nome da loja + código de acesso)
+  const lojaEl = document.getElementById('plano-loja');
+  if (lojaEl) {
+    const nomeLoja = localStorage.getItem('nome_loja') || '';
+    const codAcesso = (localStorage.getItem('codigo_acesso') || '').toUpperCase();
+    if (nomeLoja || codAcesso) {
+      lojaEl.style.display = 'flex';
+      lojaEl.innerHTML = iconeInline('loja') + ' <b>' + escHtml(nomeLoja || 'Minha loja') + '</b>' +
+        (codAcesso ? '<span class="plano-loja-cod">' + escHtml(codAcesso) + '</span>' : '');
+    } else {
+      lojaEl.style.display = 'none';
+    }
+  }
 
   usoEl.textContent = uso;
 
