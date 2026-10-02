@@ -410,7 +410,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.24</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.25</span></div>
 </div>
 
 <div class="container">
@@ -700,7 +700,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.24';
+const APP_VERSION = '6.3.25';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -1162,13 +1162,24 @@ function abrirFotoEmTelaCheia(index) {
 function abrirFotoResultado(i) {
   const item = dadosLidos[i];
   if (!item) { mostrarAvisoCustomizado('Foto não disponível.', '⚠️'); return; }
-  // Fonte da foto à PROVA DE FALHA: cria uma URL nova a partir do arquivo (o link
-  // "blob" antigo pode ter morrido se o app foi pra segundo plano no iPhone); se não
-  // der, usa a versão salva (fotoMedia) ou o previewUrl. Assim a foto SEMPRE aparece.
-  let fotoSrc = '', urlCriada = null;
-  if (item.file) { try { fotoSrc = urlCriada = URL.createObjectURL(item.file); } catch(e){} }
-  if (!fotoSrc) fotoSrc = item.fotoMedia || item.previewUrl || '';
-  if (!fotoSrc) { mostrarAvisoCustomizado('Foto não disponível.', '⚠️'); return; }
+  // Fontes da foto à PROVA DE FALHA, em ordem: arquivo original (link recriado),
+  // cópia média, miniatura, preview antigo e — se veio da coleta — a foto DE NOVO
+  // do servidor (o cofre guarda as que falharam). No iPhone, o arquivo pode
+  // "parecer vivo" e falhar SÓ na hora de carregar (app voltou do segundo plano);
+  // por isso o <img> tem onerror que pula pra próxima fonte (ver abaixo), em vez
+  // de ficar com a tela em branco.
+  const fontes = [];
+  let urlCriada = null;
+  if (item.file) { try { urlCriada = URL.createObjectURL(item.file); if (urlCriada) fontes.push(urlCriada); } catch(e){} }
+  if (item.fotoMedia) fontes.push(item.fotoMedia);
+  if (item.thumbComprimida) fontes.push(item.thumbComprimida);
+  if (item.previewUrl) fontes.push(item.previewUrl);
+  if (item.file && item.file._coletaId) {
+    const codColeta = localStorage.getItem('codigo_acesso') || '';
+    if (codColeta) fontes.push(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codColeta)}/foto/${item.file._coletaId}/img`);
+  }
+  if (!fontes.length) { mostrarAvisoCustomizado('Foto não disponível. Feche e abra o app e envie essa etiqueta de novo.', '⚠️'); return; }
+  let fotoSrc = fontes[0];
 
   // Se o envio falhou, abre a tela de RECUPERAÇÃO: foto grande com zoom (pra ler o
   // telefone na etiqueta) em cima, e o campo de telefone FIXO embaixo. Assim a foto
@@ -1202,6 +1213,15 @@ function abrirFotoResultado(i) {
       <img src="${fotoSrc}" class="foto-fullscreen-img" />`;
   }
   document.body.appendChild(overlay);
+
+  // Se a fonte falhar ao CARREGAR (não só ao criar), pula pra próxima da lista.
+  const imgFoto = overlay.querySelector(podeRecuperar ? '#rec-foto-img' : '.foto-fullscreen-img');
+  let fonteAtual = 0;
+  if (imgFoto) imgFoto.onerror = function(){
+    fonteAtual++;
+    if (fonteAtual < fontes.length) { imgFoto.src = fontes[fonteAtual]; }
+    else { fechar(); mostrarAvisoCustomizado('Não consegui carregar esta foto. Feche e abra o app e tente de novo.', '⚠️'); }
+  };
 
   // Ajusta a altura da tela ao teclado (iOS/Android): encolhe pra a área visível,
   // deixando o campo sempre logo acima do teclado, sem a foto pular.
