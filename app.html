@@ -410,7 +410,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.25</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.26</span></div>
 </div>
 
 <div class="container">
@@ -700,7 +700,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.25';
+const APP_VERSION = '6.3.26';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2597,7 +2597,7 @@ async function listarFotosColeta(){
     div.className = 'coleta-item';
     div.id = 'coleta-item-' + f.id;
     div.innerHTML =
-      `<img src="${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/foto/${f.id}/img" alt="" loading="lazy">` +
+      `<img src="${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/foto/${f.id}/img?mini=1" alt="" loading="lazy" decoding="async">` +
       `<div class="coleta-acoes">` +
         `<button class="btn-mini-enviar" onclick="enviarFotoColeta(${f.id})">Enviar</button>` +
         `<button class="btn-mini-x" onclick="descartarFotoColeta(${f.id})" title="Descartar">✕</button>` +
