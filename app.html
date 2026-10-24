@@ -412,7 +412,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.28</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.29</span></div>
 </div>
 
 <div class="container">
@@ -531,6 +531,7 @@
 
   <!-- ========== UPLOAD ========== -->
   <div class="section active" id="sec-upload">
+    <div class="alert alert-warn" id="aviso-mensalidade" style="display:none; margin-bottom:12px; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;"></div>
     <div class="card">
       <div class="card-title"><span class="ico-i" data-ico="camera"></span> Selecionar fotos</div>
       <div class="upload-area" id="upload-area" onclick="abrirSeletorFotos()">
@@ -702,7 +703,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.28';
+const APP_VERSION = '6.3.29';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -829,12 +830,100 @@ async function sincronizarConfig() {
     // Assim, se o cliente usou em outro aparelho, este já reflete o número verdadeiro.
     await sincronizarUsoDoServidor();
     atualizarResumoUsoMensal();
+    // Guarda a situação da mensalidade e atualiza a faixinha da tela principal
+    // (vence em até 3 dias, ou já vencida — com botão de pagar dentro do app).
+    infoMensalidade = {
+      dias: (cfg.vence_em_dias === undefined ? null : cfg.vence_em_dias),
+      temCobranca: !!cfg.tem_cobranca,
+      vencido: !!cfg.vencido
+    };
+    try { atualizarAvisoMensalidade(); } catch(e){}
     // Mensalidade vencida (1+ dia): o app continua abrindo, mas o envio avisa e para.
     if (cfg.vencido) return { ok: true, motivo: 'vencido' };
     return { ok: true, motivo: 'atualizado' };
   } catch (e) {
     return { ok: true, motivo: 'erro' };
   }
+}
+
+// ===== MENSALIDADE: faixinha de aviso + pagamento DENTRO do app =====
+let infoMensalidade = { dias: null, temCobranca: false, vencido: false };
+
+// Faixinha no topo da tela de envio: aparece quando falta até 3 dias pro
+// vencimento, ou quando já venceu. Com cobrança no Asaas, ganha "Pagar agora".
+function atualizarAvisoMensalidade(){
+  const el = document.getElementById('aviso-mensalidade');
+  if (!el) return;
+  const { dias, temCobranca, vencido } = infoMensalidade;
+  const mostrar = vencido || (dias != null && dias >= 0 && dias <= 3);
+  if (!mostrar){ el.style.display = 'none'; return; }
+  const texto = vencido
+    ? `${iconeInline('bloqueado')} <b>Mensalidade em aberto</b> — os envios estão pausados até o pagamento.`
+    : (dias === 0
+        ? `${iconeInline('calendario')} Sua mensalidade <b>vence hoje</b>.`
+        : `${iconeInline('calendario')} Sua mensalidade vence em <b>${dias} dia${dias > 1 ? 's' : ''}</b>.`);
+  const botao = temCobranca
+    ? `<button onclick="abrirTelaPagamento()" style="padding:8px 15px;border-radius:9px;background:#22DD7A;color:#04240f;font-weight:700;border:none;cursor:pointer;font-family:inherit;font-size:13px;">Pagar agora</button>`
+    : '';
+  el.innerHTML = `<span style="flex:1;min-width:190px;">${texto}</span>${botao}`;
+  el.style.display = 'flex';
+}
+
+// Busca a fatura em aberto + QR Pix e mostra a tela de pagamento dentro do app.
+async function abrirTelaPagamento(){
+  const codigo = localStorage.getItem('codigo_acesso');
+  let d = null;
+  try {
+    const r = await fetch(`${COMPROV_BACKEND}/fatura/${encodeURIComponent(codigo)}`);
+    d = await r.json();
+  } catch(e){}
+  if (!d || !d.fatura){
+    mostrarAvisoCustomizado('Não achei uma fatura em aberto agora. Se você acabou de pagar, aguarde alguns instantes que os envios liberam sozinhos.', '✅');
+    return;
+  }
+  const f = d.fatura, pix = d.pix;
+  const valor = (f.valor != null) ? 'R$ ' + Number(f.valor).toFixed(2).replace('.', ',') : '';
+  const venc = f.vencimento ? String(f.vencimento).split('-').reverse().join('/') : '';
+  window.__pixCodigo = (pix && pix.codigo) || '';
+  const overlay = document.createElement('div');
+  overlay.className = 'qr-modal-overlay';
+  overlay.innerHTML = `
+    <div class="qr-modal-box" style="max-width:340px;">
+      <h3 style="font-size:17px; font-weight:800; margin-bottom:4px;">Pagamento da mensalidade</h3>
+      <p style="font-size:13.5px; color:var(--text-secondary); margin-bottom:14px;">${valor}${venc ? ' · vence ' + venc : ''}</p>
+      ${pix && pix.imagem ? `
+        <img src="data:image/png;base64,${pix.imagem}" alt="QR code Pix" style="width:185px; height:185px; border-radius:12px; background:#fff; padding:8px; margin:0 auto 10px; display:block;">
+        <button onclick="copiarCodigoPix()" class="btn btn-green" style="width:100%; margin-bottom:8px;">Copiar código Pix</button>
+      ` : ''}
+      <a href="${f.url}" target="_blank" rel="noopener" style="display:block; text-align:center; padding:12px; border-radius:10px; border:1.5px solid rgba(128,128,128,.35); color:inherit; text-decoration:none; font-weight:600; font-size:14px; margin-bottom:10px;">Pagar com cartão ou boleto</a>
+      <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Pagou? Em instantes os envios liberam sozinhos. 💚</p>
+      <button class="btn" onclick="this.closest('.qr-modal-overlay').remove()" style="width:100%;">Fechar</button>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function copiarCodigoPix(){
+  const cod = window.__pixCodigo || '';
+  if (!cod) return;
+  try {
+    await navigator.clipboard.writeText(cod);
+    mostrarAvisoCustomizado('Código Pix copiado! Agora é só colar no app do seu banco.', '✅');
+  } catch(e){
+    const ta = document.createElement('textarea');
+    ta.value = cod; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); mostrarAvisoCustomizado('Código Pix copiado!', '✅'); } catch(e2){}
+    document.body.removeChild(ta);
+  }
+}
+
+// Aviso de bloqueio por mensalidade vencida, com o atalho de pagar na hora.
+function avisoMensalidadeVencida(){
+  infoMensalidade.vencido = true;
+  try { atualizarAvisoMensalidade(); } catch(e){}
+  const botao = infoMensalidade.temCobranca
+    ? `<br><br><button onclick="this.closest('.qr-modal-overlay').remove();abrirTelaPagamento()" style="padding:11px 20px;border-radius:10px;background:#22DD7A;color:#04240f;font-weight:700;border:none;cursor:pointer;font-family:inherit;font-size:14px;">Pagar agora</button>`
+    : '';
+  mostrarAvisoCustomizado('Sua mensalidade está em aberto, então os envios estão pausados. Assim que o pagamento for confirmado, tudo volta sozinho. 💚' + botao, '🚫');
 }
 
 function loadConfig() {
@@ -2333,7 +2422,7 @@ async function startProcessingServidor() {
     return;
   }
   if (sync.motivo === 'vencido') {
-    mostrarAvisoCustomizado('Sua mensalidade está em aberto, então os envios estão pausados. Assim que o pagamento for confirmado, tudo volta sozinho. Qualquer dúvida, fale com o ComproV. 💚', '🚫');
+    avisoMensalidadeVencida();
     return;
   }
   if (!limiteJaFoiDefinido()) {
@@ -2487,7 +2576,7 @@ async function startProcessingServidor() {
     loteEmAndamento = false; processandoEnvios = false; window.envioNoServidor = false;
     liberarWakeLock();
     setSection('sec-upload');
-    mostrarAvisoCustomizado('Sua mensalidade está em aberto, então os envios estão pausados. Assim que o pagamento for confirmado, tudo volta sozinho. Qualquer dúvida, fale com o ComproV. 💚', '🚫');
+    avisoMensalidadeVencida();
     return;
   }
   uploadConcluido = true;
