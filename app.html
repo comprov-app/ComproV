@@ -412,7 +412,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.27</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.28</span></div>
 </div>
 
 <div class="container">
@@ -702,7 +702,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.27';
+const APP_VERSION = '6.3.28';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -829,6 +829,8 @@ async function sincronizarConfig() {
     // Assim, se o cliente usou em outro aparelho, este já reflete o número verdadeiro.
     await sincronizarUsoDoServidor();
     atualizarResumoUsoMensal();
+    // Mensalidade vencida (1+ dia): o app continua abrindo, mas o envio avisa e para.
+    if (cfg.vencido) return { ok: true, motivo: 'vencido' };
     return { ok: true, motivo: 'atualizado' };
   } catch (e) {
     return { ok: true, motivo: 'erro' };
@@ -2330,6 +2332,10 @@ async function startProcessingServidor() {
     else mostrarAvisoCustomizado('Nao foi possivel verificar sua assinatura. Tente novamente.', '⚠️');
     return;
   }
+  if (sync.motivo === 'vencido') {
+    mostrarAvisoCustomizado('Sua mensalidade está em aberto, então os envios estão pausados. Assim que o pagamento for confirmado, tudo volta sozinho. Qualquer dúvida, fale com o ComproV. 💚', '🚫');
+    return;
+  }
   if (!limiteJaFoiDefinido()) {
     mostrarAvisoCustomizado('Sua loja ainda não foi ativada. Digite seu código de acesso no Painel.', '🔑');
     setSection('sec-painel');
@@ -2368,7 +2374,7 @@ async function startProcessingServidor() {
   // Limpa concluidos de lotes anteriores (a lista mostra so o lote atual)
   try { await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/limpar`, { method:'POST' }); } catch(e){}
 
-  let ok = 0, err = 0;
+  let ok = 0, err = 0, bloqueadoVencido = false;
   const filaIds = new Array(selectedFiles.length).fill(null);
   const hashPorIndice = new Array(selectedFiles.length).fill(null);
   const progText = document.getElementById('prog-text');
@@ -2461,6 +2467,11 @@ async function startProcessingServidor() {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ imagem_base64:b64, mimetype:'image/jpeg', intervalo_seg:segundosIntervalo, msg_config:cfgMsg })
       });
+      if (r.status === 403) {
+        let dj = null; try { dj = await r.json(); } catch(e){}
+        if (dj && dj.vencido) { bloqueadoVencido = true; break; } // mensalidade em aberto: para o lote inteiro
+        throw new Error((dj && dj.message) || 'nao subiu');
+      }
       if (!r.ok) throw new Error('nao subiu');
       const j = await r.json();
       filaIds[i] = j.id;
@@ -2469,6 +2480,15 @@ async function startProcessingServidor() {
       dadosLidos[i] = { nome:selectedFiles[i].name, file:selectedFiles[i], sucesso:false, previewUrl:items[i].previewUrl, thumbComprimida:items[i].thumbComprimida, fotoMedia:items[i].fotoMedia, erro:'Não foi possível preparar esta foto.' };
       err++;
     }
+  }
+  if (bloqueadoVencido) {
+    // Mensalidade em aberto: cancela o lote com um aviso claro (nada foi enviado deste ponto em diante).
+    clearInterval(timerPausa);
+    loteEmAndamento = false; processandoEnvios = false; window.envioNoServidor = false;
+    liberarWakeLock();
+    setSection('sec-upload');
+    mostrarAvisoCustomizado('Sua mensalidade está em aberto, então os envios estão pausados. Assim que o pagamento for confirmado, tudo volta sozinho. Qualquer dúvida, fale com o ComproV. 💚', '🚫');
+    return;
   }
   uploadConcluido = true;
 
