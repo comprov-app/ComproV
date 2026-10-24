@@ -412,7 +412,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.29</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.30</span></div>
 </div>
 
 <div class="container">
@@ -703,7 +703,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.29';
+const APP_VERSION = '6.3.30';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -895,7 +895,7 @@ async function abrirTelaPagamento(){
         <img src="data:image/png;base64,${pix.imagem}" alt="QR code Pix" style="width:185px; height:185px; border-radius:12px; background:#fff; padding:8px; margin:0 auto 10px; display:block;">
         <button onclick="copiarCodigoPix()" class="btn btn-green" style="width:100%; margin-bottom:8px;">Copiar código Pix</button>
       ` : ''}
-      <a href="${f.url}" target="_blank" rel="noopener" style="display:block; text-align:center; padding:12px; border-radius:10px; border:1.5px solid rgba(128,128,128,.35); color:inherit; text-decoration:none; font-weight:600; font-size:14px; margin-bottom:10px;">Pagar com cartão ou boleto</a>
+      <a href="${f.url}" target="_blank" rel="noopener" style="display:block; text-align:center; padding:12px; border-radius:10px; border:1.5px solid rgba(128,128,128,.45); color:#fff; text-decoration:none; font-weight:600; font-size:14px; margin-bottom:10px;">Pagar com cartão de crédito</a>
       <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Pagou? Em instantes os envios liberam sozinhos. 💚</p>
       <button class="btn" onclick="this.closest('.qr-modal-overlay').remove()" style="width:100%;">Fechar</button>
     </div>`;
