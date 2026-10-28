@@ -412,7 +412,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.30</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.31</span></div>
 </div>
 
 <div class="container">
@@ -703,7 +703,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.30';
+const APP_VERSION = '6.3.31';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2406,7 +2406,24 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && _filaCheckAtual) { try { _filaCheckAtual(); } catch(e){} }
 });
 
+// Trava contra toque duplo: a verificacao inicial (sincronizarConfig) leva 1-2s no 4G
+// sem nada mudar na tela; um 2o toque nesse tempo rodava DOIS lotes e cada cliente
+// recebia o comprovante em dobro. Agora o 2o toque e ignorado e o botao trava na hora.
+let iniciandoLote = false;
 async function startProcessingServidor() {
+  if (loteEmAndamento || iniciandoLote) return;
+  iniciandoLote = true;
+  const btnSend = document.getElementById('btn-send');
+  if (btnSend) btnSend.disabled = true;
+  try {
+    await iniciarLoteServidor();
+  } finally {
+    iniciandoLote = false;
+    if (btnSend) btnSend.disabled = selectedFiles.length === 0;
+  }
+}
+
+async function iniciarLoteServidor() {
   const codigoAcesso = localStorage.getItem('codigo_acesso');
   const evoServer   = localStorage.getItem('evo_server');
   const evoInstance = localStorage.getItem('evo_instance');
@@ -2802,9 +2819,9 @@ async function enviarFotoColeta(id, silencioso){
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ telefone, caption, imagem_base64:b64, mimetype:'image/jpeg' })
     });
-    if(rEnv.status === 409) throw new Error('Limite de envios do plano atingido.');
+    // O 409 do /enviar pode ser LIMITE ou WHATSAPP DESCONECTADO: usa a mensagem do servidor.
     const dEnv = await rEnv.json().catch(()=>null);
-    if(!rEnv.ok) throw new Error((dEnv && dEnv.message) || 'Falha ao enviar. Verifique a conexão.');
+    if(!rEnv.ok) throw new Error((dEnv && dEnv.message) || (rEnv.status === 409 ? 'Limite de envios do plano atingido.' : 'Falha ao enviar. Verifique a conexão.'));
     if(dEnv && typeof dEnv.uso_atual === 'number') localStorage.setItem('uso_mensal_contador', String(dEnv.uso_atual));
 
     // enviou: apaga do cofre e some da tela
@@ -2838,7 +2855,9 @@ function base64ParaBlob(b64, tipo){
 // guardadas no servidor; terminou o lote, é só tocar em "Enviar todas" de novo.
 const LOTE_COLETA = 100;
 async function enviarTodasColeta(){
-  if(coletaEnviando || !coletaFotos.length) return;
+  // loteEmAndamento/iniciandoLote: com um lote rodando, um novo toque trocava as fotos do
+  // lote (selectedFiles) no meio do envio.
+  if(coletaEnviando || loteEmAndamento || iniciandoLote || !coletaFotos.length) return;
   if(coletaFotos.length > LOTE_COLETA){
     const resto = coletaFotos.length - LOTE_COLETA;
     const ok = await confirmarCustomizadoAsync(
@@ -2868,12 +2887,19 @@ async function enviarTodasColeta(){
         arquivos.push(file);
       } catch(e){ /* pula essa e segue */ }
     }
-    coletaEnviando = false;
-    if(btn){ btn.disabled = false; btn.innerHTML = rotulo; }
-    if(!arquivos.length){ liberarWakeLock(); coletaStatus('⚠️ Não consegui carregar as fotos. Toque em Atualizar e tente de novo.'); return; }
+    if(!arquivos.length){
+      coletaEnviando = false;
+      if(btn){ btn.disabled = false; btn.innerHTML = rotulo; }
+      liberarWakeLock(); coletaStatus('⚠️ Não consegui carregar as fotos. Toque em Atualizar e tente de novo.'); return;
+    }
     // Vai pela pagina principal (fila do servidor + reenvio com foto).
+    // O botao so volta DEPOIS do lote (antes voltava aqui e dava pra tocar de novo no meio).
     selectedFiles = arquivos;
-    await startProcessingServidor();
+    try { await startProcessingServidor(); }
+    finally {
+      coletaEnviando = false;
+      if(btn){ btn.disabled = false; btn.innerHTML = rotulo; }
+    }
   } catch(e){
     coletaEnviando = false;
     liberarWakeLock();
@@ -2983,11 +3009,10 @@ async function enviarFoto(file, dados, serverUrl, instanceName, apiKey, b64Pront
       mimetype: file.type || 'image/jpeg'
     })
   }, 30000, 'Tempo de envio esgotado. Verifique sua conexão e tente novamente.');
-  if (resp.status === 409) {
-    throw new Error('Limite de envios do plano atingido.');
-  }
   if (!resp.ok) {
-    throw new Error('Falha ao enviar a foto. Verifique sua conexão e tente novamente.');
+    // O 409 pode ser LIMITE ou WHATSAPP DESCONECTADO: usa a mensagem do servidor.
+    const errJson = await resp.clone().json().catch(() => null);
+    throw new Error((errJson && errJson.message) || (resp.status === 409 ? 'Limite de envios do plano atingido.' : 'Falha ao enviar a foto. Verifique sua conexão e tente novamente.'));
   }
   // O servidor já incrementou o contador; atualiza o espelho local com o número dele
   try {
@@ -3019,11 +3044,10 @@ async function enviarMensagem(dados, serverUrl, instanceName, apiKey) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ telefone: telefone, caption: mensagem, apenas_texto: true })
   });
-  if (resp.status === 409) {
-    throw new Error('Limite de envios do plano atingido.');
-  }
   if (!resp.ok) {
-    throw new Error('Falha ao enviar a mensagem. Verifique sua conexão e tente novamente.');
+    // O 409 pode ser LIMITE ou WHATSAPP DESCONECTADO: usa a mensagem do servidor.
+    const errJson = await resp.clone().json().catch(() => null);
+    throw new Error((errJson && errJson.message) || (resp.status === 409 ? 'Limite de envios do plano atingido.' : 'Falha ao enviar a mensagem. Verifique sua conexão e tente novamente.'));
   }
   try {
     const data = await resp.json();
@@ -3649,13 +3673,43 @@ if ('serviceWorker' in navigator) {
       setInterval(() => reg.update(), 15000);
     }).catch((err) => console.log('Erro ao registrar service worker:', err));
 
-    // Quando o novo service worker assume o controle, recarrega a página
+    // Quando o novo service worker assume o controle, recarrega a página — MAS:
+    // - no 1o acesso (ainda sem service worker) nao ha versao velha pra trocar: recarregar
+    //   so apagava o codigo que a loja estava digitando;
+    // - com um lote rodando, recarregar perdia as fotos que ainda nao tinham subido.
+    //   Nesse caso so avisa, e a loja atualiza quando o envio terminar.
     let jaRecarregou = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (jaRecarregou) return;
+      if (!tinhaServiceWorkerAoAbrir) { tinhaServiceWorkerAoAbrir = true; return; }
+      if (loteEmAndamento || iniciandoLote) { mostrarAvisoRecarregar(); return; }
       jaRecarregou = true;
       window.location.reload();
     });
+  });
+}
+
+// A pagina ja abriu controlada por um service worker? (false no 1o acesso)
+let tinhaServiceWorkerAoAbrir = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+
+// Versao nova chegou durante um envio: banner pra atualizar DEPOIS que o lote terminar.
+function mostrarAvisoRecarregar() {
+  if (document.getElementById('reload-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'reload-banner';
+  banner.className = 'update-banner';
+  banner.innerHTML = `
+    <span><span class="ico-i" data-ico="atualizar"></span> Nova versão pronta. Atualize quando o envio terminar.</span>
+    <button class="update-btn" id="reload-btn">Atualizar</button>
+  `;
+  document.body.appendChild(banner);
+  requestAnimationFrame(() => banner.classList.add('show'));
+  document.getElementById('reload-btn').addEventListener('click', () => {
+    if (loteEmAndamento || iniciandoLote) {
+      mostrarAvisoCustomizado('Espere o envio terminar pra atualizar — assim nenhuma foto se perde.', '⏳');
+      return;
+    }
+    window.location.reload();
   });
 }
 
