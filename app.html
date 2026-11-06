@@ -412,7 +412,7 @@
     <button class="menu-item" onclick="menuIr('historico')"><span class="ico" data-ico="relogio"></span> Histórico</button>
     <button class="menu-item" onclick="menuIr('tema')"><span class="ico" id="menu-tema-ico" data-ico="lua"></span> <span id="menu-tema-txt">Modo noturno</span></button>
   </div>
-  <div class="menu-versao">ComproV <span id="app-versao">v6.3.31</span></div>
+  <div class="menu-versao">ComproV <span id="app-versao">v6.3.32</span></div>
 </div>
 
 <div class="container">
@@ -703,7 +703,7 @@ function saveConfig() {
 const COMPROV_BACKEND = 'https://app.comprov.cloud';
 // Versao do app. Sobe junto com a do service-worker.js a cada mudanca.
 // Aparece no rodape do menu lateral, e ajuda a confirmar se o cache atualizou.
-const APP_VERSION = '6.3.31';
+const APP_VERSION = '6.3.32';
 // Preenche o rodape do menu assim que o script carrega
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('app-versao');
@@ -2571,7 +2571,8 @@ async function iniciarLoteServidor() {
       const b64 = await toBase64(selectedFiles[i]);
       const r = await fetch(`${COMPROV_BACKEND}/fila/${encodeURIComponent(codigo)}/adicionar`, {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ imagem_base64:b64, mimetype:'image/jpeg', intervalo_seg:segundosIntervalo, msg_config:cfgMsg })
+        // coleta_id: o servidor liga o item à foto da coleta e tira ela do cofre quando enviar
+        body: JSON.stringify({ imagem_base64:b64, mimetype:'image/jpeg', intervalo_seg:segundosIntervalo, msg_config:cfgMsg, coleta_id: selectedFiles[i]._coletaId || null })
       });
       if (r.status === 403) {
         let dj = null; try { dj = await r.json(); } catch(e){}
@@ -2651,6 +2652,7 @@ async function fetchComTimeout(url, options, timeoutMs, mensagemTimeout) {
 // ===================================================================
 let coletaFotos = [];      // [{id, mimetype, criada_em}]
 let coletaEnviando = false;
+let avisoEmEnvioColeta = false;   // o aviso "saindo pelo servidor" está na tela
 
 function coletaStatus(msg){
   const el = document.getElementById('coleta-status');
@@ -2723,6 +2725,15 @@ async function listarFotosColeta(){
     const r = await fetch(`${COMPROV_BACKEND}/coleta/${encodeURIComponent(codigo)}/fotos`);
     const d = await r.json();
     coletaFotos = (d && d.fotos) || [];
+    // Fotos que já estão saindo pelo servidor (ex.: o app foi atualizado no meio do
+    // envio) não vêm na lista — avisa que estão a caminho, pra ninguém mandar de novo.
+    const emEnvio = (d && d.em_envio) || 0;
+    if(emEnvio > 0 && !loteEmAndamento && !coletaEnviando){
+      coletaStatus(`📤 ${emEnvio} ${emEnvio === 1 ? 'foto da coleta está' : 'fotos da coleta estão'} saindo pelo servidor agora. Não precisa enviar de novo: elas saem daqui sozinhas.`);
+      avisoEmEnvioColeta = true;
+    } else if(emEnvio === 0 && avisoEmEnvioColeta){
+      coletaStatus(''); avisoEmEnvioColeta = false;
+    }
   } catch(e){ coletaFotos = []; }
   // Marca as fotos atuais como "vistas": o aviso só notifica as que chegarem depois.
   if(coletaFotos.length){
